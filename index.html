@@ -5,27 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quran for Programming</title>
     <link rel="stylesheet" href="./css/style.css">
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500&display=swap"
+    />
 </head>
 <body>
-    <div class="menuR" id="menuR">
-        <!-- Liste des Sheikhs ici -->
-    </div>
+    <div class="welcome-screen">
+        <h1>Salam Aleykoum!</h1>
+        <p>Select your Sheikh to start:</p>
+        
+        <section class="carousel">
+            <ul class="carousel__list" id="sheikh-carousel">
+                <!-- Les sheikhs seront insérés ici dynamiquement -->
+            </ul>
+        </section>
+        
+    </div> 
+    
+    <div id="main-screen" style="display:none;">
+        <!-- Contenu principal ici -->
+        <div class="menuR" id="menuR">
+            <!-- Liste des Sheikhs ici -->
+        </div>
 
-    <div class="menuL" id="menuL">
-        <!-- Ajout de la phrase stylisée -->
-        <div class="hidden md:inline code-style">
-            <em class="blue">function</em> 
-            <span class="green">quranFor</span>(<em class="orange">task</em> = 
-            <span class="yellow">'programming'</span>) { 
-            <span class="fuschia">return</span> 
-            <span class="purple">`A series of Quran recitations intended for listening while</span>
-            <span class="yellow">${</span><span class="white">task</span><span class="yellow">}</span>
-            <span class="purple">to focus the soul and inspire the heart.`</span>; 
-            }
+        <div class="menuL" id="menuL">
+            <div class="hidden md:inline code-style">
+                <em class="blue">function</em> 
+                <span class="green">quranFor</span>(<em class="orange">task</em> = 
+                <span class="yellow">'programming'</span>) { 
+                <span class="fuschia">return</span> 
+                <span class="purple">`A series of Quran recitations intended for listening while</span>
+                <span class="yellow">${</span><span class="white">task</span><span class="yellow">}</span>
+                <span class="purple">to focus the soul and inspire the heart.`</span>; 
+                }
+            </div>
         </div>
     </div>
 
     <script src="./js/script.js"></script>
-
 </body>
 </html>

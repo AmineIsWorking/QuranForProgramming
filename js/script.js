@@ -1,3 +1,5 @@
+let currentAudio = null;
+
 // === Hacker effect pour les textes (conservé uniquement pour chargement initial) ===
 function hackerEffect(element, originalText, speed = 20, step = 3) {
     const chars = "!<>-_\\/[]{}—=+*^?#________";
@@ -90,36 +92,29 @@ function createOverlay(data) {
     const playSpan = document.createElement('span');
     playSpan.className = 'action play';
     playSpan.textContent = '[play]';
+    let isPlaying = false;
+
     playSpan.onclick = () => {
-        let currentIndex = 0;
-        const playNextSourate = () => {
-            if (currentIndex < sourates.length) {
-                const sourate = sourates[currentIndex];
-                loadJSON('./js/quran-com_timestamps.json')
-                    .then(datta => {
-                        if (datta[data.name] && datta[data.name][sourate.number]) {
-                            const audioUrl = datta[data.name][sourate.number]["audio_files"][0]["audio_url"];
-                            const audio = new Audio(audioUrl);
-                            audio.play();
-                            audio.onended = () => {
-                                currentIndex++;
-                                playNextSourate();
-                            };
-                            const durationMs = datta[data.name][sourate.number]["audio_files"][0]["duration"];
-                            detailsDuration.textContent = formatDuration(durationMs);
-                            detailsB = datta[data.name][sourate.number]["audio_files"][0]["file_size"];
-                            detailsSize.textContent = formatSize(detailsB);
-                        } else {
-                            console.error(`Erreur: Pas de données pour la sourate ${sourate.number}`);
-                        }
-                    })
-                    .catch(error => console.error('Erreur lors du chargement du fichier JSON:', error));
-            
+        if (isPlaying) {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
             }
-        };
-        playNextSourate();
+            playSpan.textContent = '[play]';
+            playSpan.appendChild(detailsDuration);
+            isPlaying = false;
+            return;
+        }
+
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+        }
+
     };
 
+    
     const detailsDuration = document.createElement('span');
     detailsDuration.className = 'details';
     detailsDuration.textContent = '...';
@@ -149,7 +144,6 @@ function createOverlay(data) {
     const list = document.createElement('div');
     list.className = "sourate-list";
     
-    let currentAudio = null;
     sourates.forEach((sourate) => {
         const item = document.createElement('li');
         item.className = "sourate-item";
@@ -160,25 +154,39 @@ function createOverlay(data) {
             if (currentAudio) {
                 currentAudio.pause();
                 currentAudio.currentTime = 0;
+                currentAudio = null;
+                playSpan.textContent = '[play]';
+                playSpan.appendChild(detailsDuration);
+                isPlaying = false;
             }
+        
             loadJSON('./js/quran-com_timestamps.json') 
                 .then(datta => { 
                     if (datta[data.name]) {
-                        currentAudio = new Audio(datta[data.name][sourate.number]["audio_files"][0]["audio_url"]);
+                        const audioUrl = datta[data.name][sourate.number]["audio_files"][0]["audio_url"];
+                        currentAudio = new Audio(audioUrl);
                         currentAudio.play();
+                        
+                        playSpan.textContent = '[stop]';
+                        playSpan.appendChild(detailsDuration);
+                        isPlaying = true;
+        
+                        currentAudio.onended = () => {
+                            playSpan.textContent = '[play]';
+                            playSpan.appendChild(detailsDuration);
+                            isPlaying = false;
+                        };
+        
                         const durationMs = datta[data.name][sourate.number]["audio_files"][0]["duration"];
                         detailsDuration.textContent = formatDuration(durationMs);
                         detailsB = datta[data.name][sourate.number]["audio_files"][0]["file_size"];
                         detailsSize.textContent = formatSize(detailsB);
-                        // Ouvrir un nouvel onglet avec la source datta[data.name][sourate.number]["audio_files"][0]["audio_url"]
                         sourceSpan.onclick = () => {
-                            window.open(datta[data.name][sourate.number]["audio_files"][0]["audio_url"]);
+                            window.open(audioUrl);
                         };
-
                     } else {
                         console.error('Erreur: Pas de données pour cette sourate');
                     }
-
                 })
                 .catch(error => console.error('Erreur lors du chargement du fichier JSON:', error));
         };
@@ -235,6 +243,167 @@ window.addEventListener("DOMContentLoaded", () => {
         menu.appendChild(div);
     });
 });
+
+// === Initialisation du carrousel ===
+document.addEventListener("DOMContentLoaded", () => {
+    const carouselList = document.getElementById('sheikh-carousel');
+    
+    // Créer les éléments du carrousel pour chaque sheikh
+    sheikhs.forEach((sheikh, index) => {
+        const carouselItem = document.createElement('li');
+        carouselItem.className = 'carousel__item';
+        carouselItem.tabIndex = 0;
+        if (index === 0) carouselItem.setAttribute('data-active', 'true');
+        
+        carouselItem.innerHTML = `
+            <div class="carousel__box">
+                <div class="carousel__image">
+                    <img src="${sheikh.photo}" width="480" height="720" alt="${sheikh.name}">
+                </div>
+                <div class="carousel__contents">
+                    <h2 class="sheikh__name">${sheikh.name}</h2>
+                </div>
+            </div>
+        `;
+        
+        carouselItem.addEventListener('click', () => {
+            initializeSheikh(index);
+        });
+        
+        carouselList.appendChild(carouselItem);
+    });
+
+    // Initialiser la logique du carrousel
+    initCarouselLogic();
+});
+
+function initCarouselLogic() {
+    const d = document;
+    const $q = d.querySelectorAll.bind(d);
+    const $g = d.querySelector.bind(d);
+    const $list = $g(".carousel__list");
+    let auto;
+    let pauser;
+
+    const getActiveIndex = () => {
+    const $active = $g("[data-active]");
+    return getSlideIndex($active);
+    };
+
+    const getSlideIndex = ($slide) => {
+    return [...$q(".carousel__item")].indexOf($slide);
+    };
+
+    const prevSlide = () => {
+    const index = getActiveIndex();
+    const $slides = $q(".carousel__item");
+    const $last = $slides[$slides.length - 1];
+    $last.remove();
+    $list.prepend($last);
+    activateSlide($q(".carousel__item")[index]);
+    };
+    const nextSlide = () => {
+    const index = getActiveIndex();
+    const $slides = $q(".carousel__item");
+    const $first = $slides[0];
+    $first.remove();
+    $list.append($first);
+    activateSlide($q(".carousel__item")[index]);
+    };
+
+    const chooseSlide = (e) => {
+    const max = window.matchMedia("screen and ( max-width: 600px)").matches
+        ? 5
+        : 8;
+    const $slide = e.target.closest(".carousel__item");
+    const index = getSlideIndex($slide);
+    if (index < 3 || index > max) return;
+    if (index === max) nextSlide();
+    if (index === 3) prevSlide();
+    activateSlide($slide);
+    };
+
+    const activateSlide = ($slide) => {
+    if (!$slide) return;
+    const $slides = $q(".carousel__item");
+    $slides.forEach((el) => el.removeAttribute("data-active"));
+    $slide.setAttribute("data-active", true);
+    $slide.focus();
+    };
+
+    const autoSlide = () => {
+    nextSlide();
+    };
+
+    const pauseAuto = () => {
+    clearInterval(auto);
+    clearTimeout(pauser);
+    };
+
+    const handleNextClick = (e) => {
+    pauseAuto();
+    nextSlide(e);
+    };
+
+    const handlePrevClick = (e) => {
+    pauseAuto();
+    prevSlide(e);
+    };
+
+    const handleSlideClick = (e) => {
+    pauseAuto();
+    chooseSlide(e);
+    };
+
+    const handleSlideKey = (e) => {
+    switch (e.keyCode) {
+        case 37:
+        case 65:
+        handlePrevClick();
+        break;
+        case 39:
+        case 68:
+        handleNextClick();
+        break;
+    }
+    };
+
+    const startAuto = () => {
+    auto = setInterval(autoSlide, 3000);
+    };
+
+    startAuto();
+
+    // === Activer le slide du milieu au chargement ===
+    const initialSlide = $q(".carousel__item")[Math.floor($q(".carousel__item").length / 2)];
+    activateSlide(initialSlide);
+
+
+    $list.addEventListener("focusin", handleSlideClick);
+    $list.addEventListener("keyup", handleSlideKey);
+}
+
+// Fonction pour initialiser l'écran principal avec le Sheikh sélectionné
+window.initializeSheikh = function (index) {
+    const sheikh = sheikhs[index];
+    console.log('Selected Sheikh:', sheikh.name);
+    document.querySelector('.welcome-screen').style.display = 'none';
+    document.getElementById('main-screen').style.display = 'block';
+    
+    // Active l'élément du menu correspondant
+    const menuItems = document.querySelectorAll('.menu-item');
+    menuItems.forEach(item => item.classList.remove('active'));
+    menuItems[index].classList.add('active');
+    
+    // Affiche les informations du sheikh
+    const currentOverlay = document.querySelector('.sheikh-info');
+    if (currentOverlay) {
+        currentOverlay.replaceWith(createOverlay(sheikh));
+    } else {
+        document.body.appendChild(createOverlay(sheikh));
+    }
+};
+
 
 // === Liste des sheikhs ===
 const sheikhs = [
