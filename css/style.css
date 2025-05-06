@@ -68,16 +68,55 @@ body {
     height: 100vh;
 }
 
+.welcome-message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  padding: 20px;
+  font-size: 24px;
+  font-family: 'IBM', monospace;
+  z-index: 9999;
+  opacity: 1;
+  transition: top 2s ease-in-out, opacity 2s ease-in-out;
+}
+
+.welcome-message.up {
+  top: 7%;
+  opacity: 1;
+}
+
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(50px); /* Départ depuis le bas */
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0); /* Position finale */
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 1s ease-out forwards; /* Animation sur 1 seconde */
+}
+
 .welcome-screen {
+    opacity: 0;
+    transition: opacity 2s ease-in;
+    font-family: 'IBM', monospace;
     position: absolute;
     top: 0;
     text-align: center;
     font-size: 24px;
-    color: #1beb9e;
+    color: #ffffff;
 }
 
-#welcome-screen h1 {
-    font-size: 36px;
+
+.welcome-screen.fade-in {
+    opacity: 1;
 }
 
 
@@ -355,7 +394,7 @@ display: inline;
     display: grid;
     transform: translate3d(0, 0, 0.1px);
     width: 100%;
-    margin-top: 2rem;
+    margin-top: 4rem;
     overflow: hidden;
   }
   
@@ -503,6 +542,7 @@ display: inline;
   .carousel__item[data-active] * {
     opacity: 1;
     filter: none;
+    width: 100%;
   }
   
   .carousel__contents {
@@ -550,7 +590,7 @@ display: inline;
 
   @media screen and (max-width: 800px) {
     .carousel__item img {
-      width: calc(var(--width) * 0.7);
+      width: 100%;
     }
     .carousel__contents {
       transform: translateX(-100%) rotate(90deg);
@@ -620,7 +660,8 @@ display: inline;
     }
     
     .carousel__contents .sheikh__name {
-      font-size: 1.3em;
+      font-size: 0.9em;
+      text-align: end;
     }
     
   }

@@ -28,6 +28,7 @@ function hackerEffect(element, originalText, speed = 20, step = 3) {
     }, speed);
 }
 
+
 function formatDuration(durationMs) {
     const seconds = Math.floor((durationMs / 1000) % 60);
     const minutes = Math.floor((durationMs / (1000 * 60)) % 60);
@@ -199,50 +200,34 @@ function createOverlay(data) {
 }
 
 
-// === Animation en cascade à la fin du chargement (uniquement pour textes initiaux) ===
 window.addEventListener("DOMContentLoaded", () => {
-    const elements = Array.from(document.body.querySelectorAll("*"))
-        .filter(el =>
-            el.childNodes.length === 1 &&
-            el.childNodes[0].nodeType === Node.TEXT_NODE &&
-            el.textContent.trim().length > 0
-        );
+    const welcomeMessage = document.getElementById('welcome-message');
 
-    elements.forEach((el, index) => {
-        const text = el.textContent;
-        el.textContent = "";
+    const originalText = welcomeMessage.textContent;
+    welcomeMessage.textContent = "";
+    hackerEffect(welcomeMessage, originalText);
 
-        setTimeout(() => {
-            hackerEffect(el, text);
-        }, index * 100);
-    });
+    setTimeout(() => {
+        welcomeMessage.style.display = 'none';
+    }, 3000);
 
-    // Génère le menu une fois que le DOM est prêt
-    const menu = document.getElementById('menuR');
-    sheikhs.sort((a, b) => a.name.localeCompare(b.name)); // Trie les sheikhs par ordre alphabétique
+    setTimeout(() => {
+        const newText = "Select your Sheikh to start:";
+        welcomeMessage.textContent = "";
+        welcomeMessage.style.display = 'block';
+        hackerEffect(welcomeMessage, newText);
+        welcomeMessage.classList.add('up');
+    }, 3000);
 
-    sheikhs.forEach((sheikh) => {
-        const div = document.createElement('div');
-        div.className = 'menu-item';
-        div.textContent = sheikh.name;
-        div.onclick = () => {
-            // Supprime le style actif des autres éléments
-            const activeItem = document.querySelector('.menu-item.active');
-            if (activeItem) {
-                activeItem.classList.remove('active');
-            }
-            // Applique le style actif à l'élément sélectionné
-            div.classList.add('active');
-            const current = document.querySelector('.sheikh-info');
-            if (current) {
-                current.replaceWith(createOverlay(sheikh));
-            } else {
-                document.body.appendChild(createOverlay(sheikh));
-            }
-        };
-        menu.appendChild(div);
-    });
+    const carouselList = document.getElementById('sheikh-carousel');
+    const welcomeScreen = document.querySelector('.welcome-screen');
+    setTimeout(() => {
+        carouselList.classList.add('fade-in-up');
+        welcomeScreen.classList.add('fade-in');
+    }, 3500);
+
 });
+
 
 // === Initialisation du carrousel ===
 document.addEventListener("DOMContentLoaded", () => {
@@ -281,78 +266,81 @@ function initCarouselLogic() {
     const d = document;
     const $q = d.querySelectorAll.bind(d);
     const $g = d.querySelector.bind(d);
+    const $prev = $g(".prev");
+    const $next = $g(".next");
     const $list = $g(".carousel__list");
     let auto;
     let pauser;
 
     const getActiveIndex = () => {
-    const $active = $g("[data-active]");
-    return getSlideIndex($active);
+        const $active = $g("[data-active]");
+        return getSlideIndex($active);
     };
 
     const getSlideIndex = ($slide) => {
-    return [...$q(".carousel__item")].indexOf($slide);
+        return [...$q(".carousel__item")].indexOf($slide);
     };
 
     const prevSlide = () => {
-    const index = getActiveIndex();
-    const $slides = $q(".carousel__item");
-    const $last = $slides[$slides.length - 1];
-    $last.remove();
-    $list.prepend($last);
-    activateSlide($q(".carousel__item")[index]);
+        const index = getActiveIndex();
+        const $slides = $q(".carousel__item");
+        const $last = $slides[$slides.length - 1];
+        $last.remove();
+        $list.prepend($last);
+        activateSlide($q(".carousel__item")[index]);
     };
+
     const nextSlide = () => {
-    const index = getActiveIndex();
-    const $slides = $q(".carousel__item");
-    const $first = $slides[0];
-    $first.remove();
-    $list.append($first);
-    activateSlide($q(".carousel__item")[index]);
+        const index = getActiveIndex();
+        const $slides = $q(".carousel__item");
+        const $first = $slides[0];
+        $first.remove();
+        $list.append($first);
+        activateSlide($q(".carousel__item")[index]);
     };
 
     const chooseSlide = (e) => {
-    const max = window.matchMedia("screen and ( max-width: 600px)").matches
-        ? 5
-        : 8;
-    const $slide = e.target.closest(".carousel__item");
-    const index = getSlideIndex($slide);
-    if (index < 3 || index > max) return;
-    if (index === max) nextSlide();
-    if (index === 3) prevSlide();
-    activateSlide($slide);
+        const max = window.matchMedia("screen and ( max-width: 600px)").matches
+            ? 5
+            : 8;
+        const $slide = e.target.closest(".carousel__item");
+        const index = getSlideIndex($slide);
+        if (index < 3 || index > max) return;
+        if (index === max) nextSlide();
+        if (index === 3) prevSlide();
+        activateSlide($slide);
     };
 
     const activateSlide = ($slide) => {
-    if (!$slide) return;
-    const $slides = $q(".carousel__item");
-    $slides.forEach((el) => el.removeAttribute("data-active"));
-    $slide.setAttribute("data-active", true);
-    $slide.focus();
+        if (!$slide) return;
+        const $slides = $q(".carousel__item");
+        $slides.forEach((el) => el.removeAttribute("data-active"));
+        $slide.setAttribute("data-active", true);
+        $slide.focus();
     };
 
     const autoSlide = () => {
-    nextSlide();
+        nextSlide();
     };
 
     const pauseAuto = () => {
-    clearInterval(auto);
-    clearTimeout(pauser);
+        clearInterval(auto);
+        clearTimeout(pauser);
     };
 
     const handleNextClick = (e) => {
-    pauseAuto();
-    nextSlide(e);
+        pauseAuto();
+        nextSlide(e);
     };
 
     const handlePrevClick = (e) => {
-    pauseAuto();
-    prevSlide(e);
+        pauseAuto();
+        prevSlide(e);
     };
 
     const handleSlideClick = (e) => {
-    pauseAuto();
-    chooseSlide(e);
+        pauseAuto();
+        chooseSlide(e);
     };
 
     const handleSlideKey = (e) => {
@@ -369,7 +357,7 @@ function initCarouselLogic() {
     };
 
     const startAuto = () => {
-    auto = setInterval(autoSlide, 3000);
+        auto = setInterval(autoSlide, 3000);
     };
 
     startAuto();
@@ -377,17 +365,17 @@ function initCarouselLogic() {
     // === Activer le slide du milieu au chargement ===
     const initialSlide = $q(".carousel__item")[Math.floor($q(".carousel__item").length / 2)];
     activateSlide(initialSlide);
-
-
+    $list.addEventListener("keydown", handleSlideKey);
+    $prev.addEventListener("click", handlePrevClick);
+    $next.addEventListener("click", handleNextClick);
     $list.addEventListener("focusin", handleSlideClick);
-    $list.addEventListener("keyup", handleSlideKey);
 }
 
 // Fonction pour initialiser l'écran principal avec le Sheikh sélectionné
 window.initializeSheikh = function (index) {
     const sheikh = sheikhs[index];
-    console.log('Selected Sheikh:', sheikh.name);
     document.querySelector('.welcome-screen').style.display = 'none';
+    document.querySelector('.welcome-message').style.display = 'none';
     document.getElementById('main-screen').style.display = 'block';
     
     // Active l'élément du menu correspondant
@@ -404,6 +392,51 @@ window.initializeSheikh = function (index) {
     }
 };
 
+// === Animation en cascade à la fin du chargement (uniquement pour textes initiaux) ===
+window.addEventListener("DOMContentLoaded", () => {
+    const elements = Array.from(document.body.querySelectorAll("*"))
+        .filter(el =>
+            el.childNodes.length === 1 &&
+            el.childNodes[0].nodeType === Node.TEXT_NODE &&
+            el.textContent.trim().length > 0
+        );
+
+    elements.forEach((el, index) => {
+        const text = el.textContent;
+        el.textContent = "";
+
+        setTimeout(() => {
+            hackerEffect(el, text);
+        }, index * 100);
+    });
+
+    // Génère le menu une fois que le DOM est prêt
+    const menu = document.getElementById('menuR');
+    const copieSheikhs = [...sheikhs];
+    copieSheikhs.sort((a, b) => a.name.localeCompare(b.name)); // Trie les sheikhs par ordre alphabétique
+
+    copieSheikhs.forEach((sheikh) => {
+        const div = document.createElement('div');
+        div.className = 'menu-item';
+        div.textContent = sheikh.name;
+        div.onclick = () => {
+            // Supprime le style actif des autres éléments
+            const activeItem = document.querySelector('.menu-item.active');
+            if (activeItem) {
+                activeItem.classList.remove('active');
+            }
+            // Applique le style actif à l'élément sélectionné
+            div.classList.add('active');
+            const current = document.querySelector('.sheikh-info');
+            if (current) {
+                current.replaceWith(createOverlay(sheikh));
+            } else {
+                document.body.appendChild(createOverlay(sheikh));
+            }
+        };
+        menu.appendChild(div);
+    });
+});
 
 // === Liste des sheikhs ===
 const sheikhs = [
