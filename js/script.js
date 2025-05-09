@@ -1,4 +1,129 @@
+// Variables globales
 let currentAudio = null;
+let currentSourateIndex = -1;
+let isLoopMode = false;
+let currentVolume = 1.0;
+let isPlaying = false;
+let updateInterval;
+
+
+// Fonction pour mettre à jour le nom de la sourate
+function updateSourateName(sourate) {
+    const marquee = document.getElementById('current-sourate');
+    const baseText = `${sourate.number}. ${sourate.name} (${sourate.arabicname})`;
+    
+    // Répète le texte 3 fois séparé par des •
+    const marqueeText = `${baseText} • ${baseText} • ${baseText}`;
+    marquee.textContent = marqueeText;
+    
+    // Ajuste la vitesse en fonction de la longueur
+    const textWidth = marquee.scrollWidth / 3; // Largeur d'une occurrence
+    const duration = Math.max(10, textWidth / 30); // 30px par seconde
+    
+    // Applique l'animation
+    marquee.style.animation = `marquee-step ${duration}s steps(${Math.floor(textWidth/10)}) infinite`;
+    
+    // Redémarre l'animation
+    marquee.style.animation = 'none';
+    void marquee.offsetWidth; // Force le reflow
+    marquee.style.animation = `marquee-step ${duration}s steps(${Math.floor(textWidth/10)}) infinite`;
+}
+
+// Fonction pour mettre à jour le temps
+function updateCurrentTime() {
+    if (currentAudio) {
+        const currentTimeMs = currentAudio.currentTime * 1000;
+        const seconds = Math.floor(currentTimeMs / 1000) % 60;
+        const minutes = Math.floor(currentTimeMs / (1000 * 60)) % 60;
+        const hours = Math.floor(currentTimeMs / (1000 * 60 * 60));
+        
+        document.getElementById('current-time').textContent = 
+            String(hours).padStart(2, '0') + ':' +
+            String(minutes).padStart(2, '0') + ':' +
+            String(seconds).padStart(2, '0');
+    }
+}
+
+// Fonction pour charger et jouer une sourate
+function loadAndPlaySourate(sheikh, sourateIndex) {
+    const sourate = sourates[sourateIndex];
+    currentSourateIndex = sourateIndex;
+    updateSourateName(sourate);
+
+    loadJSON('./js/quran-com_timestamps.json')
+        .then(datta => {
+            if (datta[sheikh.name]) {
+                if (currentAudio) {
+                    currentAudio.pause();
+                    clearInterval(updateInterval);
+                }
+
+                const audioUrl = datta[sheikh.name][sourate.number]["audio_files"][0]["audio_url"];
+                currentAudio = new Audio(audioUrl);
+                currentAudio.volume = currentVolume;
+                
+                // Mettre à jour les infos de durée
+                const durationMs = datta[sheikh.name][sourate.number]["audio_files"][0]["duration"];
+                document.querySelectorAll('.details')[0].textContent = formatDuration(durationMs);
+                
+                // Mettre à jour la source
+                document.querySelector('.source').onclick = () => window.open(audioUrl);
+                const taille = datta[sheikh.name][sourate.number]["audio_files"][0]["file_size"];
+                document.querySelectorAll('.details')[1].textContent = formatSize(taille);
+
+                // Jouer l'audio
+                currentAudio.play()
+                    .then(() => {
+                        isPlaying = true;
+                        document.getElementById('play-pause').textContent = '[stop]';
+                        
+                        // Mettre à jour le temps régulièrement
+                        updateInterval = setInterval(updateCurrentTime, 1000);
+                        
+                        // Quand l'audio se termine
+                        currentAudio.onended = () => {
+                            clearInterval(updateInterval);
+                            
+                            if (isLoopMode) {
+                                // Mode boucle - réinitialiser et relire
+                                currentAudio.currentTime = 0;
+                                document.getElementById('current-time').textContent = '00:00:00'; // Réinitialisation visuelle
+                                currentAudio.play()
+                                    .then(() => {
+                                        updateInterval = setInterval(updateCurrentTime, 1000); // Relancer l'update du temps
+                                    })
+                                    .catch(error => console.error('Erreur de relance:', error));
+                            } else {
+                                // Mode normal
+                                isPlaying = false;
+                                document.getElementById('play-pause').textContent = '[play]';
+                                if (isAutoMode) {
+                                    playNextSourate();
+                                }
+                            }
+                        };
+                    })
+                    .catch(error => console.error('Erreur de lecture:', error));
+            }
+        })
+        .catch(error => console.error('Erreur lors du chargement du fichier JSON:', error));
+}
+
+// Fonction pour jouer la sourate suivante
+function playNextSourate() {
+    if (currentSourateIndex < sourates.length - 1) {
+        const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+        loadAndPlaySourate(sheikh, currentSourateIndex + 1);
+    }
+}
+
+// Fonction pour jouer la sourate précédente
+function playPrevSourate() {
+    if (currentSourateIndex > 0) {
+        const sheikh = sheikhs.find(s => s.name === document.querySelector('.menu-item.active').textContent);
+        loadAndPlaySourate(sheikh, currentSourateIndex - 1);
+    }
+}
 
 // === Hacker effect pour les textes (conservé uniquement pour chargement initial) ===
 function hackerEffect(element, originalText, speed = 20, step = 3) {
@@ -32,8 +157,10 @@ function hackerEffect(element, originalText, speed = 20, step = 3) {
 function formatDuration(durationMs) {
     const seconds = Math.floor((durationMs / 1000) % 60);
     const minutes = Math.floor((durationMs / (1000 * 60)) % 60);
-    const hours = Math.floor((durationMs / (1000 * 60 * 60)) % 24);
-    return (hours > 0 ? String(hours).padStart(2, '0') + ':' : '') +
+    const hours = Math.floor((durationMs / (1000 * 60 * 60)));
+    
+    // Toujours afficher les heures, même si elles sont à 0
+    return String(hours).padStart(2, '0') + ':' +
            String(minutes).padStart(2, '0') + ':' +
            String(seconds).padStart(2, '0');
 }
@@ -94,27 +221,6 @@ function createOverlay(data) {
     playSpan.className = 'action play';
     playSpan.textContent = '[play]';
     let isPlaying = false;
-
-    playSpan.onclick = () => {
-        if (isPlaying) {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
-                currentAudio = null;
-            }
-            playSpan.textContent = '[play]';
-            playSpan.appendChild(detailsDuration);
-            isPlaying = false;
-            return;
-        }
-
-        if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
-        }
-
-    };
-
     
     const detailsDuration = document.createElement('span');
     detailsDuration.className = 'details';
@@ -152,44 +258,8 @@ function createOverlay(data) {
                           <div class="sourate-arabic">${sourate.arabicname}</div>
         `;
         item.onclick = () => {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
-                currentAudio = null;
-                playSpan.textContent = '[play]';
-                playSpan.appendChild(detailsDuration);
-                isPlaying = false;
-            }
-        
-            loadJSON('./js/quran-com_timestamps.json') 
-                .then(datta => { 
-                    if (datta[data.name]) {
-                        const audioUrl = datta[data.name][sourate.number]["audio_files"][0]["audio_url"];
-                        currentAudio = new Audio(audioUrl);
-                        currentAudio.play();
-                        
-                        playSpan.textContent = '[stop]';
-                        playSpan.appendChild(detailsDuration);
-                        isPlaying = true;
-        
-                        currentAudio.onended = () => {
-                            playSpan.textContent = '[play]';
-                            playSpan.appendChild(detailsDuration);
-                            isPlaying = false;
-                        };
-        
-                        const durationMs = datta[data.name][sourate.number]["audio_files"][0]["duration"];
-                        detailsDuration.textContent = formatDuration(durationMs);
-                        detailsB = datta[data.name][sourate.number]["audio_files"][0]["file_size"];
-                        detailsSize.textContent = formatSize(detailsB);
-                        sourceSpan.onclick = () => {
-                            window.open(audioUrl);
-                        };
-                    } else {
-                        console.error('Erreur: Pas de données pour cette sourate');
-                    }
-                })
-                .catch(error => console.error('Erreur lors du chargement du fichier JSON:', error));
+            const sheikh = data;
+            loadAndPlaySourate(sheikh, sourates.indexOf(sourate));
         };
     
         list.appendChild(item);
@@ -238,6 +308,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const carouselItem = document.createElement('li');
         carouselItem.className = 'carousel__item';
         carouselItem.tabIndex = 0;
+        carouselItem.dataset.index = index;
         if (index === 0) carouselItem.setAttribute('data-active', 'true');
         
         carouselItem.innerHTML = `
@@ -250,10 +321,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
             </div>
         `;
-        
-        carouselItem.addEventListener('click', () => {
-            initializeSheikh(index);
-        });
         
         carouselList.appendChild(carouselItem);
     });
@@ -299,18 +366,6 @@ function initCarouselLogic() {
         activateSlide($q(".carousel__item")[index]);
     };
 
-    const chooseSlide = (e) => {
-        const max = window.matchMedia("screen and ( max-width: 600px)").matches
-            ? 5
-            : 8;
-        const $slide = e.target.closest(".carousel__item");
-        const index = getSlideIndex($slide);
-        if (index < 3 || index > max) return;
-        if (index === max) nextSlide();
-        if (index === 3) prevSlide();
-        activateSlide($slide);
-    };
-
     const activateSlide = ($slide) => {
         if (!$slide) return;
         const $slides = $q(".carousel__item");
@@ -340,18 +395,69 @@ function initCarouselLogic() {
 
     const handleSlideClick = (e) => {
         pauseAuto();
-        chooseSlide(e);
+        const $slide = e.target.closest(".carousel__item");
+        if (!$slide) return;
+
+        const index = parseInt($slide.dataset.index, 10);
+
+        const isActive = $slide.hasAttribute("data-active");
+
+        if (isActive) {
+            // Sélection directe : on anime les autres
+            const slides = [...document.querySelectorAll(".carousel__item")];
+            const middleIndex = Math.floor(slides.length / 2);
+
+            slides.forEach((slide, i) => {
+                if (i < middleIndex) {
+                    slide.classList.add("exit-left");
+                } else if (i > middleIndex) {
+                    slide.classList.add("exit-right");
+                }
+                // le Sheikh sélectionné reste sans classe
+            });
+
+            // Attend la fin de l'animation avant d'initialiser
+            if (!window.isSheikhInitializing) {
+                window.isSheikhInitializing = true;
+                setTimeout(() => {
+                    initializeSheikh(index);
+                    window.isSheikhInitializing = false;
+                }, 500); // durée identique à l'animation CSS
+            }
+        } else {
+            // Recentrer ce Sheikh
+            const slides = [...document.querySelectorAll(".carousel__item")];
+            const middleIndex = Math.floor(slides.length / 2);
+            const currentIndexInDOM = slides.indexOf($slide);
+            const offset = currentIndexInDOM - middleIndex;
+
+            if (offset > 0) {
+                for (let i = 0; i < offset; i++) nextSlide();
+            } else {
+                for (let i = 0; i < Math.abs(offset); i++) prevSlide();
+            }
+
+            // Activer celui qui est maintenant au centre
+            const newCenter = document.querySelectorAll(".carousel__item")[middleIndex];
+            activateSlide(newCenter);
+        }
     };
 
     const handleSlideKey = (e) => {
     switch (e.keyCode) {
-        case 37:
-        case 65:
+        case 37: // Left arrow
+        case 65: // 'A' key
         handlePrevClick();
         break;
-        case 39:
-        case 68:
+        case 39: // Right arrow
+        case 68: // 'D' key
         handleNextClick();
+        break;
+        case 13: // Enter key
+        const $slide = e.target.closest(".carousel__item");
+        if ($slide) {
+            handleSlideClick({ target: $slide });
+        }
         break;
     }
     };
@@ -365,50 +471,148 @@ function initCarouselLogic() {
     // === Activer le slide du milieu au chargement ===
     const initialSlide = $q(".carousel__item")[Math.floor($q(".carousel__item").length / 2)];
     activateSlide(initialSlide);
+
     $list.addEventListener("keydown", handleSlideKey);
+    $list.addEventListener("click", handleSlideClick);
     $prev.addEventListener("click", handlePrevClick);
     $next.addEventListener("click", handleNextClick);
     $list.addEventListener("focusin", handleSlideClick);
 }
 
+// Fonction pour calculer les statistiques
+async function calculateSheikhStats(sheikhName) {
+    try {
+        const data = await loadJSON('./js/quran-com_timestamps.json');
+        const sheikhData = data[sheikhName];
+        
+        if (!sheikhData) return null;
+
+        let totalDurationMs = 0;
+        
+        // Parcours toutes les sourates
+        for (const sourateNum in sheikhData) {
+            const audioFiles = sheikhData[sourateNum].audio_files;
+            if (audioFiles && audioFiles.length > 0) {
+                totalDurationMs += audioFiles[0].duration;
+            }
+        }
+        
+        // Conversion de la durée
+        const totalSeconds = Math.floor(totalDurationMs / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        
+        return {
+            duration: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+            hours,
+            minutes,
+            seconds
+        };
+    } catch (error) {
+        console.error("Erreur calcul stats:", error);
+        return null;
+    }
+}
+
+// Fonction pour afficher les stats
+async function displaySheikhStats(sheikhName) {
+    const stats = await calculateSheikhStats(sheikhName);
+    if (!stats) return;
+    document.getElementById('heures').textContent = '// ' + stats.hours;
+    document.getElementById('minutes').textContent = '// ' + stats.minutes;
+    document.getElementById('secondes').textContent = '// ' + stats.seconds;
+}
+
+
+
 // Fonction pour initialiser l'écran principal avec le Sheikh sélectionné
 window.initializeSheikh = function (index) {
     const sheikh = sheikhs[index];
-    document.querySelector('.welcome-screen').style.display = 'none';
-    document.querySelector('.welcome-message').style.display = 'none';
-    document.getElementById('main-screen').style.display = 'block';
-    
-    // Active l'élément du menu correspondant
-    const menuItems = document.querySelectorAll('.menu-item');
-    menuItems.forEach(item => item.classList.remove('active'));
-    menuItems[index].classList.add('active');
-    
-    // Affiche les informations du sheikh
-    const currentOverlay = document.querySelector('.sheikh-info');
-    if (currentOverlay) {
-        currentOverlay.replaceWith(createOverlay(sheikh));
-    } else {
-        document.body.appendChild(createOverlay(sheikh));
-    }
+    displaySheikhStats(sheikh.name);
+
+    const welcomeMessage = document.querySelector('.welcome-message.up');
+    const welcomeScreen = document.querySelector('.welcome-screen');
+    const mainScreen = document.getElementById('main-screen');
+
+    const activeSlide = document.querySelector('[data-active]');
+
+    // === Cloner l'image ===
+    const sheikhImg = activeSlide.querySelector('img');
+    const imgRect = sheikhImg.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(sheikhImg);
+
+    const imgClone = sheikhImg.cloneNode(true);
+    imgClone.style.position = 'fixed';
+    imgClone.style.top = imgRect.top + 'px';
+    imgClone.style.left = imgRect.left + 'px';
+    imgClone.style.width = imgRect.width + 'px';
+    imgClone.style.height = imgRect.height + 'px';
+    imgClone.style.zIndex = '9999';
+    imgClone.style.transition = 'all 0.8s ease-in-out';
+
+    // 🧪 Copier les styles visuels
+    imgClone.style.boxShadow = computedStyle.boxShadow;
+    imgClone.style.objectFit = computedStyle.objectFit;
+    imgClone.style.filter = computedStyle.filter;
+    imgClone.style.opacity = computedStyle.opacity;
+    imgClone.style.borderRadius = '16px';
+
+    document.body.appendChild(imgClone);
+
+
+    // Cacher temporairement menuL et menuR
+    const menuL = document.querySelector('.menuL');
+    const menuR = document.querySelector('.menuR');
+    menuL.style.opacity = '0';
+    menuR.style.opacity = '0';
+
+    // === Fade-out de l'écran de bienvenue ===
+    welcomeMessage.classList.add('fade-out');
+
+    setTimeout(() => {
+        welcomeMessage.remove();
+        welcomeScreen.remove();
+
+        mainScreen.style.display = 'block';
+
+        const currentOverlay = document.querySelector('.sheikh-info');
+        let newOverlay = createOverlay(sheikh);
+        newOverlay.style.opacity = '0'; // On cache
+        document.body.appendChild(newOverlay);
+
+        // === Transition de l'image ===
+        const targetImg = newOverlay.querySelector('img');
+        const targetRect = targetImg.getBoundingClientRect();
+
+        requestAnimationFrame(() => {
+            imgClone.style.top = targetRect.top + 'px';
+            imgClone.style.left = targetRect.left + 'px';
+            imgClone.style.width = targetRect.width + 'px';
+            imgClone.style.height = targetRect.height + 'px';
+        });
+
+        // === Une fois l'image en place ===
+        setTimeout(() => {
+            imgClone.remove();
+            newOverlay.style.transition = 'opacity 0.4s ease';
+            newOverlay.style.opacity = '1';
+
+            // 🆕 Afficher doucement menuL et menuR
+            menuL.style.transition = 'opacity 0.4s ease';
+            menuR.style.transition = 'opacity 0.4s ease';
+            menuL.style.opacity = '1';
+            menuR.style.opacity = '1';
+
+        }, 800);
+
+    }, 500);
 };
+
+
 
 // === Animation en cascade à la fin du chargement (uniquement pour textes initiaux) ===
 window.addEventListener("DOMContentLoaded", () => {
-    const elements = Array.from(document.body.querySelectorAll("*"))
-        .filter(el =>
-            el.childNodes.length === 1 &&
-            el.childNodes[0].nodeType === Node.TEXT_NODE &&
-            el.textContent.trim().length > 0
-        );
-
-    elements.forEach((el, index) => {
-        const text = el.textContent;
-        el.textContent = "";
-
-        setTimeout(() => {
-            hackerEffect(el, text);
-        }, index * 100);
-    });
 
     // Génère le menu une fois que le DOM est prêt
     const menu = document.getElementById('menuR');
@@ -433,9 +637,76 @@ window.addEventListener("DOMContentLoaded", () => {
             } else {
                 document.body.appendChild(createOverlay(sheikh));
             }
+
+            displaySheikhStats(sheikh.name);
         };
         menu.appendChild(div);
     });
+});
+
+// Gestion des événements
+document.getElementById('play-pause').addEventListener('click', () => {
+    if (currentAudio) {
+        if (isPlaying) {
+            currentAudio.pause();
+            isPlaying = false;
+            document.getElementById('play-pause').textContent = '[play]';
+            clearInterval(updateInterval);
+        } else {
+            currentAudio.play()
+                .then(() => {
+                    isPlaying = true;
+                    document.getElementById('play-pause').textContent = '[stop]';
+                    updateInterval = setInterval(updateCurrentTime, 1000);
+                });
+        }
+    }
+});
+
+document.getElementById('next-sourate').addEventListener('click', playNextSourate);
+document.getElementById('prev-sourate').addEventListener('click', playPrevSourate);
+
+document.getElementById('forward-30').addEventListener('click', () => {
+    if (currentAudio) {
+        currentAudio.currentTime = Math.min(currentAudio.currentTime + 30, currentAudio.duration);
+        updateCurrentTime();
+    }
+});
+
+document.getElementById('backward-30').addEventListener('click', () => {
+    if (currentAudio) {
+        currentAudio.currentTime = Math.max(currentAudio.currentTime - 30, 0);
+        updateCurrentTime();
+    }
+});
+
+document.getElementById('volume-up').addEventListener('click', () => {
+    currentVolume = Math.min(currentVolume + 0.1, 1.0);
+    if (currentAudio) currentAudio.volume = currentVolume;
+    const percent = Math.round(currentVolume * 100);
+    document.getElementById('volume-level').textContent = 
+    `${percent}%`.length === 3 ? `${percent}%` : ` ${percent}%`;
+});
+
+document.getElementById('volume-down').addEventListener('click', () => {
+    currentVolume = Math.max(currentVolume - 0.1, 0);
+    if (currentAudio) currentAudio.volume = currentVolume;
+    const percent = Math.round(currentVolume * 100);
+    document.getElementById('volume-level').textContent = 
+    `${percent}%`.length === 3 ? `${percent}%` : ` ${percent}%`;
+});
+
+document.getElementById('loop-mode').addEventListener('click', () => {
+    const Item = document.getElementById('loop-mode').textContent = '[loop]';
+    const activeItem = document.querySelector('.control-btn.active');
+    if (activeItem) {
+        activeItem.classList.remove('active');
+        isLoopMode = false;
+    }
+    else {
+        document.getElementById('loop-mode').classList.add('active');
+        isLoopMode = true;
+    }
 });
 
 // === Liste des sheikhs ===
@@ -629,8 +900,6 @@ function loadJSON(url) {
         });
 }
 
-  
-
 // Fonction pour jouer l'audio
 function playAudio(audioUrl) {
     const audio = new Audio(audioUrl);
@@ -638,3 +907,5 @@ function playAudio(audioUrl) {
         .then(() => console.log('Lecture de l\'audio lancée!'))
         .catch(error => console.log('Erreur de lecture audio: ', error));
 }
+
+
