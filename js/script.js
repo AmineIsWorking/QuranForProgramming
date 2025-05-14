@@ -5,6 +5,10 @@ let isLoopMode = false;
 let currentVolume = 1.0;
 let isPlaying = false;
 let updateInterval;
+let currentHighlightInterval = null;
+let currentSourateAudioUrl = null;
+let currentSurahText = null;
+let isLoadingSourate = false;
 
 
 // Fonction pour mettre à jour le nom de la sourate
@@ -46,9 +50,18 @@ function updateCurrentTime() {
 
 // Fonction pour charger et jouer une sourate
 function loadAndPlaySourate(sheikh, sourateIndex) {
+    if (isLoadingSourate) return;
+    isLoadingSourate = true;
+
     const sourate = sourates[sourateIndex];
     currentSourateIndex = sourateIndex;
-    updateSourateName(sourate);
+    currentSurahText = null;
+    
+    // Arrêter tout surlignage en cours
+    if (currentHighlightInterval) {
+        clearInterval(currentHighlightInterval);
+        currentHighlightInterval = null;
+    }
 
     loadJSON('./js/quran-com_timestamps.json')
         .then(datta => {
@@ -58,71 +71,224 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                     clearInterval(updateInterval);
                 }
 
+                const surahData = datta[sheikh.name][sourate.number];
                 const audioUrl = datta[sheikh.name][sourate.number]["audio_files"][0]["audio_url"];
+                currentSourateAudioUrl = audioUrl; // Stocker l'URL courante
+                
                 currentAudio = new Audio(audioUrl);
                 currentAudio.volume = currentVolume;
-                
-                // Mettre à jour les infos de durée
-                const durationMs = datta[sheikh.name][sourate.number]["audio_files"][0]["duration"];
-                document.querySelectorAll('.details')[0].textContent = formatDuration(durationMs);
-                
-                // Mettre à jour la source
-                document.querySelector('.source').onclick = () => window.open(audioUrl);
-                const taille = datta[sheikh.name][sourate.number]["audio_files"][0]["file_size"];
-                document.querySelectorAll('.details')[1].textContent = formatSize(taille);
+                currentVerseTimings = surahData["audio_files"][0]["verse_timings"];
 
-                // Jouer l'audio
-                currentAudio.play()
-                    .then(() => {
+                // Mise à jour UI
+                updateSourateName(sourate);
+                document.querySelector('.circular-btn').style.opacity = '1';
+                document.querySelectorAll('.details')[0].textContent = formatDuration(surahData["audio_files"][0]["duration"]);
+                document.querySelector('.source').onclick = () => window.open(audioUrl);
+                document.querySelectorAll('.details')[1].textContent = formatSize(surahData["audio_files"][0]["file_size"]);
+
+                // Gestionnaire pour le début de lecture
+                const onAudioStarted = () => {
+                    // Vérifier qu'on a bien le bon audio (au cas où l'utilisateur change rapidement)
+                    if (currentAudio && currentAudio.src === currentSourateAudioUrl) {
                         isPlaying = true;
                         document.getElementById('play-pause').textContent = '[stop]';
                         
-                        // Mettre à jour le temps régulièrement
+                        // Démarrer la mise à jour du temps
                         updateInterval = setInterval(updateCurrentTime, 1000);
                         
-                        // Quand l'audio se termine
-                        currentAudio.onended = () => {
-                            clearInterval(updateInterval);
-                            
-                            if (isLoopMode) {
-                                // Mode boucle - réinitialiser et relire
-                                currentAudio.currentTime = 0;
-                                document.getElementById('current-time').textContent = '00:00:00'; // Réinitialisation visuelle
-                                currentAudio.play()
-                                    .then(() => {
-                                        updateInterval = setInterval(updateCurrentTime, 1000); // Relancer l'update du temps
-                                    })
-                                    .catch(error => console.error('Erreur de relance:', error));
-                            } else {
-                                // Mode normal
-                                isPlaying = false;
-                                document.getElementById('play-pause').textContent = '[play]';
-                                if (isAutoMode) {
-                                    playNextSourate();
-                                }
-                            }
-                        };
-                    })
-                    .catch(error => console.error('Erreur de lecture:', error));
+                        // Démarrer le surlignage SEULEMENT maintenant
+                        currentHighlightInterval = setInterval(() => {
+                            highlightCurrentVerse();
+                        }, 200);
+                    }
+                };
+
+                // Gestionnaire pour la fin de lecture
+                currentAudio.onended = () => {
+                    clearInterval(updateInterval);
+                    clearInterval(currentHighlightInterval);
+
+                    if (isLoopMode && currentAudio.src === currentSourateAudioUrl) {
+                        currentAudio.currentTime = 0;
+                        currentAudio.play().then(onAudioStarted);
+                    } else {
+                        isPlaying = false;
+                        document.getElementById('play-pause').textContent = '[play]';
+                    }
+                };
+
+                // Démarrer la lecture
+                currentAudio.play()
+                .then(() => {
+                    onAudioStarted();
+                    isLoadingSourate = false;
+                })
+                .catch(error => {
+                    console.error('Erreur de lecture:', error);
+                    isLoadingSourate = false;
+                });
             }
         })
         .catch(error => console.error('Erreur lors du chargement du fichier JSON:', error));
 }
 
-// Fonction pour jouer la sourate suivante
-function playNextSourate() {
-    if (currentSourateIndex < sourates.length - 1) {
-        const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
-        loadAndPlaySourate(sheikh, currentSourateIndex + 1);
+
+function highlightCurrentVerse() {
+    if (!currentAudio || !currentVerseTimings || currentAudio.paused || currentAudio.src !== currentSourateAudioUrl) {
+        return;
+    }
+
+    const currentTime = currentAudio.currentTime * 1000; // en millisecondes
+    const verseTexts = document.querySelectorAll('.verse-text');
+
+    // Réinitialiser tout surlignage
+    verseTexts.forEach(v => {
+        v.innerHTML = v.textContent; // Supprime les balises <span>
+        v.style.backgroundColor = '';
+    });
+
+    for (let i = 0; i < currentVerseTimings.length; i++) {
+        const verseTiming = currentVerseTimings[i];
+
+        if (currentTime >= verseTiming.timestamp_from && currentTime <= verseTiming.timestamp_to) {
+            const verseNumber = parseInt(verseTiming.verse_key.split(':')[1]);
+            const verseElement = document.querySelector(`.verse[data-verse="${verseNumber}"] .verse-text`);
+
+            if (!verseElement || !verseTiming.segments) return;
+
+            const verseText = verseElement.textContent;
+            const words = verseText.trim().match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]+(?:\s*[ۛۖۚۗۙۘۜ۝۞])*/g); // séparation des mots
+            let highlightedHtml = '';
+            let segmentHighlighted = false;
+            // Défilement automatique
+            const container = document.querySelector('.surah-text-container');
+            if (container) {
+                const containerRect = container.getBoundingClientRect();
+                const verseRect = verseElement.getBoundingClientRect();
+                const buffer = 300; // Marge en pixels
+
+                let scrollOffset = 0;
+
+                if (verseRect.bottom > containerRect.bottom - buffer) {
+                    scrollOffset = verseRect.bottom - containerRect.bottom + buffer;
+                }
+
+                if (scrollOffset !== 0) {
+                    container.scrollTo({
+                        top: container.scrollTop + scrollOffset,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+
+
+            for (let j = 0; j < verseTiming.segments.length; j++) {
+                const segment = verseTiming.segments[j];
+                if (segment.length < 3) continue;
+
+                const [segmentIndex, from, to] = segment;
+                if (currentTime >= from && currentTime <= to) {
+                    const wordStart = segmentIndex - 1;
+                    const wordEnd = wordStart; // ou autre logique si plusieurs mots
+
+                    words.forEach((word, index) => {
+                        if (index === wordStart) {
+                            highlightedHtml += `<span style="background-color: rgba(200,200,200,0.3);">`;
+                        }
+
+                        highlightedHtml += word;
+
+                        if (index === wordEnd) {
+                            highlightedHtml += `</span>`;
+                        }
+
+                        if (index < words.length - 1) highlightedHtml += ' ';
+                    });
+
+                    verseElement.innerHTML = highlightedHtml;
+                    segmentHighlighted = true;
+                    break;
+                }
+            }
+
+            if (!segmentHighlighted) {
+                verseElement.innerHTML = words.join(' '); // pas de surlignage actif
+            }
+
+            return;
+        }
     }
 }
 
-// Fonction pour jouer la sourate précédente
-function playPrevSourate() {
-    if (currentSourateIndex > 0) {
-        const sheikh = sheikhs.find(s => s.name === document.querySelector('.menu-item.active').textContent);
-        loadAndPlaySourate(sheikh, currentSourateIndex - 1);
+
+
+// Fonctions pour jouer suivant/précédent (version optimisée)
+function playNextSourate() {
+    const container = document.querySelector('.sourate-container');
+    const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+    
+    if (container.style.opacity === '1') {
+        if (currentSourateIndex < sourates.length - 1) {
+            // Transition visuelle
+            container.style.transition = 'opacity 0.3s ease';
+            container.style.opacity = '0';
+            
+            setTimeout(() => {
+                loadAndPlaySourate(sheikh, currentSourateIndex + 1);
+                loadSurahText(currentSourateIndex).then(() => {
+                    container.style.opacity = '1';
+                });
+            }, 300);
+        }
+    } else if (currentAudio) {
+        // Mode audio seul
+        currentAudio.pause();
+        if (currentSourateIndex < sourates.length - 1) {
+            loadAndPlaySourate(sheikh, currentSourateIndex + 1);
+        }
     }
+}
+
+function playPrevSourate() {
+    const container = document.querySelector('.sourate-container');
+    const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+    
+    if (container.style.opacity === '1') {
+        if (currentSourateIndex > 0) {
+            container.style.transition = 'opacity 0.3s ease';
+            container.style.opacity = '0';
+            
+            setTimeout(() => {
+                loadAndPlaySourate(sheikh, currentSourateIndex - 1);
+                loadSurahText(currentSourateIndex).then(() => {
+                    container.style.opacity = '1';
+                });
+            }, 300);
+        }
+    } else if (currentAudio) {
+        currentAudio.pause();
+        if (currentSourateIndex > 0) {
+            loadAndPlaySourate(sheikh, currentSourateIndex - 1);
+        }
+    }
+}
+
+// Fonction pour charger le texte d'une sourate
+function loadSurahText(index) {
+    return new Promise((resolve, reject) => {
+        const surahNumber = String(index + 1);
+        
+        loadJSON(`./js/surah/${surahNumber}.json`)
+            .then(data => {
+                currentSurahText = data;
+                displaySurahText(currentSurahText);
+                resolve();
+            })
+            .catch(error => {
+                console.error("Erreur chargement texte sourate:", error);
+                reject(error);
+            });
+    });
 }
 
 // === Hacker effect pour les textes (conservé uniquement pour chargement initial) ===
@@ -179,6 +345,9 @@ function formatSize(size) {
 function createOverlay(data) {
     const overlay = document.createElement('div');
     overlay.className = 'sheikh-info';
+    overlay.style.display = 'block';
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'auto';
 
     const header = document.createElement('div');
     header.className = 'sheikh-header';
@@ -220,7 +389,9 @@ function createOverlay(data) {
     const playSpan = document.createElement('span');
     playSpan.className = 'action play';
     playSpan.textContent = '[play]';
-    let isPlaying = false;
+    playSpan.onclick = () => {
+
+    };
     
     const detailsDuration = document.createElement('span');
     detailsDuration.className = 'details';
@@ -269,6 +440,95 @@ function createOverlay(data) {
     return overlay;
 }
 
+async function toggleSheikhInfo() {
+    const sheikhInfo = document.querySelector('.sheikh-info');
+    const container = document.querySelector('.sourate-container');
+    
+    // Charger le texte de la sourate si nécessaire
+    if (!currentSurahText && currentSourateIndex !== undefined) {
+        try {
+            const surahNumber = String(currentSourateIndex + 1);
+            currentSurahText = await loadJSON(`./js/surah/${surahNumber}.json`);
+        } catch (error) {
+            console.error("Erreur chargement texte sourate:", error);
+            return;
+        }
+    }
+
+    if (sheikhInfo) {
+        if (sheikhInfo.style.opacity === '1') {
+            // Mode disparition
+            sheikhInfo.style.opacity = '0';
+            sheikhInfo.style.pointerEvents = 'none'; // Désactive les interactions
+            container.style.opacity = '1';
+            container.style.pointerEvents = 'auto'; // Réactive les interactions
+            displaySurahText(currentSurahText);
+            
+        } else {
+            // Mode apparition
+            sheikhInfo.style.display = 'block'; 
+            sheikhInfo.style.opacity = '1';
+            sheikhInfo.style.pointerEvents = 'auto';
+            container.style.opacity = '0';
+            container.style.pointerEvents = 'none';
+        }
+    }
+}
+
+function displaySurahText(surahData) {
+    const container = document.querySelector('.sourate-container');
+    container.innerHTML = ''; // Vide le conteneur
+    
+    const textContainer = document.createElement('div');
+    textContainer.className = 'surah-text-container';
+    textContainer.style.opacity = '0'; // Commence invisible
+    
+    // Titre de la sourate avec animation
+    const title = document.createElement('h3');
+    title.textContent = `${surahData.index}. ${sourates[surahData.index - 1].name} - ${sourates[surahData.index - 1].arabicname}`;
+    textContainer.appendChild(title);
+
+    // Création des versets
+    for (let i = 1; i <= surahData.count; i++) {
+        const verseKey = `verse_${i}`;
+        if (surahData.verse[verseKey]) {
+            const verseElement = document.createElement('div');
+            verseElement.className = 'verse';
+            verseElement.dataset.verse = i;
+            verseElement.style.opacity = '0'; // Commence invisible
+            verseElement.style.transition = `opacity 0.2s ease ${i * 0.05}s`; // Animation en cascade
+
+            const verseText = document.createElement('span');
+            verseText.className = 'verse-text';
+            verseText.textContent = surahData.verse[verseKey];
+
+            const verseNumber = document.createElement('span');
+            verseNumber.className = 'verse-number';
+            verseNumber.textContent = ' ' + i;
+
+            verseElement.appendChild(verseText);
+            verseElement.appendChild(verseNumber);
+            textContainer.appendChild(verseElement);
+        }
+    }
+
+    container.appendChild(textContainer);
+    
+    // Animation d'apparition
+    setTimeout(() => {
+        textContainer.style.transition = 'opacity 0.3s ease';
+        textContainer.style.opacity = '1';
+        
+        // Animation des versets en cascade
+        const verses = textContainer.querySelectorAll('.verse');
+        verses.forEach(verse => {
+            verse.style.opacity = '1';
+        });
+    }, 10);
+}
+
+
+document.querySelector('.circular-btn').addEventListener('click', toggleSheikhInfo);
 
 window.addEventListener("DOMContentLoaded", () => {
     const welcomeMessage = document.getElementById('welcome-message');
@@ -594,15 +854,15 @@ window.initializeSheikh = function (index) {
 
         // === Une fois l'image en place ===
         setTimeout(() => {
-            imgClone.remove();
-            newOverlay.style.transition = 'opacity 0.4s ease';
-            newOverlay.style.opacity = '1';
-
             // 🆕 Afficher doucement menuL et menuR
             menuL.style.transition = 'opacity 0.4s ease';
             menuR.style.transition = 'opacity 0.4s ease';
             menuL.style.opacity = '1';
             menuR.style.opacity = '1';
+
+            imgClone.remove();
+            newOverlay.style.transition = 'opacity 0.4s ease';
+            newOverlay.style.opacity = '1';
 
         }, 800);
 
@@ -636,6 +896,15 @@ window.addEventListener("DOMContentLoaded", () => {
                 current.replaceWith(createOverlay(sheikh));
             } else {
                 document.body.appendChild(createOverlay(sheikh));
+            }
+
+            const container = document.querySelector('.sourate-container');
+            if (current.style.opacity === '0') {
+                current.style.display = 'block'; 
+                current.style.opacity = '1';
+                current.style.pointerEvents = 'auto';
+                container.style.opacity = '0';
+                container.style.pointerEvents = 'none';
             }
 
             displaySheikhStats(sheikh.name);
@@ -708,6 +977,7 @@ document.getElementById('loop-mode').addEventListener('click', () => {
         isLoopMode = true;
     }
 });
+
 
 // === Liste des sheikhs ===
 const sheikhs = [
@@ -908,4 +1178,4 @@ function playAudio(audioUrl) {
         .catch(error => console.log('Erreur de lecture audio: ', error));
 }
 
-
+  
