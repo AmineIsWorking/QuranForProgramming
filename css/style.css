@@ -190,7 +190,7 @@ body {
 
 .menuL {
     overflow-y: auto;
-    max-height: 600px;
+    max-height: 1000px;
     padding: 10px;
     position: absolute;
     left: 0;
@@ -216,6 +216,7 @@ body {
 .control-btn {
   background: none;
   border: none;
+  font-weight: bold;
   color: #1beb9e;
   cursor: pointer;
   font-family: inherit;
@@ -223,16 +224,14 @@ body {
   display: inline;
 }
 
-.control-btn.active {
+.control-btn.active, .action.play.active {
   color: rgba(0, 0, 0, 0.899);
   background-color: #1beb9e;
-  opacity: 0.8;
 }
 
 .control-btn:hover {
   color: rgba(0, 0, 0, 0.899);
   background-color: #1beb9e;
-  opacity: 0.8;
 }
 
 #current-sourate {
@@ -463,7 +462,7 @@ display: inline;
 .media-info {
   font-family: 'IBM', monospace;
   position: absolute;
-  top: 350px;
+  top: 330px;
   left: 20px;
   width: 100px; 
   font-size: 14px;
@@ -487,7 +486,7 @@ display: inline;
 .media-info .details {
     position: absolute;
     width: 100px;
-    left: 65px;
+    left: 55px;
     color: #555; 
     font-style: italic;
 }
@@ -495,16 +494,18 @@ display: inline;
 .media-info .action.source .details {
     position: absolute;
     width: 100px;
-    left: 75px;
+    font-weight: bold;
+    left: 85px;
     color: #555; 
     font-style: italic;
     
   }
 
 .action.source {
-    top: 25px;
+    top: 20px;
     position: absolute;
     color: #b462ff;
+    font-weight: bold;
     cursor: pointer;
 }
 
@@ -512,6 +513,20 @@ display: inline;
     background-color: #b462ff;
     color: #000000c1;
 }
+
+.fav {
+  position: absolute;
+  top: 40px;
+  font-weight: bold;
+  color: #f7c948;
+  cursor: pointer;
+}
+
+.media-info .fav:hover {
+  background-color: #f7c948;
+  color: #000000c1;
+}
+
 
 .souratesContainer {
     position: absolute;
@@ -930,4 +945,58 @@ body::-webkit-scrollbar,
 
 .current-verse {
     background-color: rgba(200, 200, 200, 0.3);
+}
+
+.highlight {
+    color: #dddd25;
+}
+
+.highlight.active {
+    background-color: #dddd25;
+    color: rgba(0, 0, 0, 0.899);
+}
+
+.highlight:hover {
+    background-color: #dddd25;
+    color: rgba(0, 0, 0, 0.899);
+}
+
+#ack-cookies {
+  background: none;
+  border: none;
+  font-weight: bold;
+  color: #dddd25;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  display: inline;
+}
+
+#ack-cookies:hover {
+  background-color: #dddd25;
+  color: rgba(0, 0, 0, 0.899);
+}
+
+#cookie-alert {
+    position: absolute;
+    top: 650px;
+    z-index: 1000;
+}
+
+.learning {
+  position: absolute;
+  top: 60px;
+  font-weight: bold;
+  color: #ff45b4;
+  cursor: pointer;
+}
+
+.learning:hover {
+  background-color: #ff45b4;
+  color: #000000c1;
+}
+
+.learning.active {
+  color: rgba(0, 0, 0, 0.899);
+  background-color: #ff45b4;
 }

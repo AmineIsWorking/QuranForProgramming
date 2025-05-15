@@ -9,7 +9,8 @@ let currentHighlightInterval = null;
 let currentSourateAudioUrl = null;
 let currentSurahText = null;
 let isLoadingSourate = false;
-
+let isPlayAll = false;
+let isLearning = false;
 
 // Fonction pour mettre à jour le nom de la sourate
 function updateSourateName(sourate) {
@@ -107,11 +108,21 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                 currentAudio.onended = () => {
                     clearInterval(updateInterval);
                     clearInterval(currentHighlightInterval);
-
-                    if (isLoopMode && currentAudio.src === currentSourateAudioUrl) {
+                    if (isLoopMode) {
                         currentAudio.currentTime = 0;
                         currentAudio.play().then(onAudioStarted);
+                    } else if (isPlayAll) {
+                        if (currentSourateIndex < sourates.length - 1) {
+                            const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+                            loadAndPlaySourate(sheikh, currentSourateIndex + 1);
+                        }
+                    } else if (isLearning) {
+                        if (currentSourateIndex > 0) {
+                            const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+                            loadAndPlaySourate(sheikh, currentSourateIndex - 1);
+                        }
                     } else {
+                        isPlayAll = false;
                         isPlaying = false;
                         document.getElementById('play-pause').textContent = '[play]';
                     }
@@ -388,9 +399,14 @@ function createOverlay(data) {
     
     const playSpan = document.createElement('span');
     playSpan.className = 'action play';
-    playSpan.textContent = '[play]';
+    playSpan.textContent = '[all]';
     playSpan.onclick = () => {
-
+        isPlayAll = !isPlayAll;
+        if (isPlayAll) {
+            playSpan.classList.add('active');
+        } else {
+            playSpan.classList.remove('active');
+        }
     };
     
     const detailsDuration = document.createElement('span');
@@ -412,8 +428,59 @@ function createOverlay(data) {
     sourceSpan.appendChild(detailsSize);
 
     mediaInfo.appendChild(sourceSpan);
-    overlay.appendChild(mediaInfo);
 
+    const favoriteSpan = document.createElement('span');
+    favoriteSpan.className = 'fav';
+    // Récupérer la liste des favoris depuis les cookies
+    let favSheikhs = getCookie('favSheikhs');
+    favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+    const sheikhName = data.name;
+
+    if (favSheikhs.includes(sheikhName)) {
+        favoriteSpan.textContent = '[forget]';
+    }
+    else {
+        favoriteSpan.textContent = '[favorite]';
+    }
+
+    favoriteSpan.onclick = () => {
+        // Mettre à jour la liste des favoris lors du clic
+        let favSheikhs = getCookie('favSheikhs');
+        favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+        const sheikhName = data.name;
+
+        if (favSheikhs.includes(sheikhName)) {
+            // Supprimer des favoris
+            favSheikhs = favSheikhs.filter(s => s !== sheikhName);
+            favoriteSpan.classList.remove('active');
+            favoriteSpan.textContent = '[favorite]';
+        } else {
+            // Ajouter aux favoris
+            favSheikhs.push(sheikhName);
+            favoriteSpan.classList.add('active');
+            favoriteSpan.textContent = '[forget]';
+        }
+
+        setCookie('favSheikhs', JSON.stringify(favSheikhs));
+        updateSheikhHighlights(); // Cette ligne va maintenant aussi réorganiser le carrousel
+    };
+
+    mediaInfo.appendChild(favoriteSpan);
+
+    const learning = document.createElement('span');
+    learning.className = 'learning';
+    learning.textContent = '[learningPath]';
+    learning.onclick = () => {
+        isLearning = !isLearning;
+        if (isLearning) {
+            learning.classList.add('active');
+        } else {
+            learning.classList.remove('active');
+        }
+    };
+
+    mediaInfo.appendChild(learning);
+    overlay.appendChild(mediaInfo);
     
     const container = document.createElement('div');
     container.className = 'souratesContainer';
@@ -563,14 +630,28 @@ window.addEventListener("DOMContentLoaded", () => {
 document.addEventListener("DOMContentLoaded", () => {
     const carouselList = document.getElementById('sheikh-carousel');
     
-    // Créer les éléments du carrousel pour chaque sheikh
-    sheikhs.forEach((sheikh, index) => {
+    // Récupérer les sheikhs favoris depuis les cookies
+    let favSheikhs = getCookie('favSheikhs');
+    favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+
+    // Trier les sheikhs pour mettre les favoris en premier
+    const sortedSheikhs = [...sheikhs].sort((a, b) => {
+        const aIsFav = favSheikhs.includes(a.name);
+        const bIsFav = favSheikhs.includes(b.name);
+        
+        if (aIsFav && !bIsFav) return -1;
+        if (!aIsFav && bIsFav) return 1;
+        return 0;
+    });
+
+    // Créer les éléments du carrousel pour chaque sheikh (dans l'ordre trié)
+    sortedSheikhs.forEach((sheikh, index) => {
         const carouselItem = document.createElement('li');
         carouselItem.className = 'carousel__item';
         carouselItem.tabIndex = 0;
-        carouselItem.dataset.index = index;
-        if (index === 0) carouselItem.setAttribute('data-active', 'true');
-        
+        carouselItem.dataset.index = index; // Garder l'index original
+        if (index == 0) carouselItem.setAttribute('data-active', 'true');
+
         carouselItem.innerHTML = `
             <div class="carousel__box">
                 <div class="carousel__image">
@@ -726,11 +807,24 @@ function initCarouselLogic() {
         auto = setInterval(autoSlide, 3000);
     };
 
-    startAuto();
+    setTimeout(() => {
+        startAuto();
+    }, 3000);
 
     // === Activer le slide du milieu au chargement ===
-    const initialSlide = $q(".carousel__item")[Math.floor($q(".carousel__item").length / 2)];
-    activateSlide(initialSlide);
+    const slides = [...$q(".carousel__item")];
+    const middleIndex = Math.floor(slides.length / 2);
+    const offset = 0 - middleIndex; // car tu veux que le slide d'indice 0 soit au milieu
+
+    if (offset > 0) {
+        for (let i = 0; i < offset; i++) nextSlide();
+    } else {
+        for (let i = 0; i < Math.abs(offset); i++) prevSlide();
+    }
+
+    const newCenter = $q(".carousel__item")[middleIndex];
+    activateSlide(newCenter);
+
 
     $list.addEventListener("keydown", handleSlideKey);
     $list.addEventListener("click", handleSlideClick);
@@ -788,7 +882,19 @@ async function displaySheikhStats(sheikhName) {
 
 // Fonction pour initialiser l'écran principal avec le Sheikh sélectionné
 window.initializeSheikh = function (index) {
-    const sheikh = sheikhs[index];
+    let favSheikhs = getCookie('favSheikhs');
+    favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+
+    const sortedSheikhs = [...sheikhs].sort((a, b) => {
+        const aIsFav = favSheikhs.includes(a.name);
+        const bIsFav = favSheikhs.includes(b.name);
+        
+        if (aIsFav && !bIsFav) return -1;
+        if (!aIsFav && bIsFav) return 1;
+        return 0;
+    });
+
+    const sheikh = sortedSheikhs[index];
     displaySheikhStats(sheikh.name);
 
     const welcomeMessage = document.querySelector('.welcome-message.up');
@@ -866,6 +972,16 @@ window.initializeSheikh = function (index) {
 
         }, 800);
 
+        // Active the menu item whose text matches the selected sheikh's name
+        const sheikhName = document.querySelector('.sheikh-name')?.textContent;
+        document.querySelectorAll('.menu-item').forEach(item => {
+            if (item.textContent === sheikhName) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
     }, 500);
 };
 
@@ -877,7 +993,21 @@ window.addEventListener("DOMContentLoaded", () => {
     // Génère le menu une fois que le DOM est prêt
     const menu = document.getElementById('menuR');
     const copieSheikhs = [...sheikhs];
-    copieSheikhs.sort((a, b) => a.name.localeCompare(b.name)); // Trie les sheikhs par ordre alphabétique
+    
+    // Trie les sheikhs : si pas de favoris, ordre alphabétique ; sinon, favoris d'abord puis alphabétique
+    let favSheikhs = getCookie('favSheikhs');
+    favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+    if (favSheikhs.length === 0) {
+        copieSheikhs.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+        copieSheikhs.sort((a, b) => {
+            const aIsFav = favSheikhs.includes(a.name);
+            const bIsFav = favSheikhs.includes(b.name);
+            if (aIsFav && !bIsFav) return -1;
+            if (!aIsFav && bIsFav) return 1;
+            return a.name.localeCompare(b.name);
+        });
+    }
 
     copieSheikhs.forEach((sheikh) => {
         const div = document.createElement('div');
@@ -910,7 +1040,9 @@ window.addEventListener("DOMContentLoaded", () => {
             displaySheikhStats(sheikh.name);
         };
         menu.appendChild(div);
+        updateSheikhHighlights();
     });
+
 });
 
 // Gestion des événements
@@ -1179,3 +1311,54 @@ function playAudio(audioUrl) {
 }
 
   
+function setCookie(name, value, days = 365) {
+    const expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + expires + '; path=/';
+}
+
+function getCookie(name) {
+    return document.cookie.split('; ').reduce((r, v) => {
+        const parts = v.split('=');
+        return parts[0] === name ? decodeURIComponent(parts[1]) : r;
+    }, '');
+}
+
+function updateSheikhHighlights() {
+    const favSheikhs = getCookie('favSheikhs');
+    const oKCookie = getCookie('oKCookie');
+
+    if (!oKCookie) {
+        showCookieAlert();
+        return;
+    }
+
+    const favList = favSheikhs ? JSON.parse(favSheikhs) : [];
+
+    // 1. Mettre à jour le menu
+    document.querySelectorAll('.menu-item').forEach(item => {
+        const sheikhName = item.textContent;
+        item.classList.toggle('highlight', favList.includes(sheikhName));
+    });
+}
+
+function showCookieAlert() {
+    if (document.getElementById('cookie-alert')) return; // éviter les doublons
+
+    const alert = document.createElement('div');
+    alert.id = 'cookie-alert';
+
+    const menuL = document.querySelector('.menuL');
+    alert.innerHTML = `
+        <div style="margin-top: 1em; color: #dddd25;">
+            Do you know cookies are a thing?<br>
+            <span id="ack-cookies" style="cursor: pointer; text-decoration: underline;">[yes I'm aware]</span>
+        </div>
+    `;
+    menuL.appendChild(alert);
+
+    document.getElementById('ack-cookies').addEventListener('click', () => {
+        setCookie('oKCookie', 'whatever');
+        alert.remove();
+        updateSheikhHighlights(); // met à jour les highlights après acceptation
+    });
+}
