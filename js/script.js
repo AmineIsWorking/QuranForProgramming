@@ -1,4 +1,328 @@
+// Variables globales
+let statsWorker = null;
 let currentAudio = null;
+let currentSourateIndex = -1;
+let isLoopMode = false;
+let currentVolume = 1.0;
+let isPlaying = false;
+let updateInterval;
+let currentHighlightInterval = null;
+let currentSourateAudioUrl = null;
+let currentSurahText = null;
+let isLoadingSourate = false;
+let isPlayAll = false;
+let isLearning = false;
+const statsCache = {};
+
+// Fonction pour mettre à jour le nom de la sourate
+function updateSourateName(sourate) {
+    const marquee = document.getElementById('current-sourate');
+    const baseText = `${sourate.number}. ${sourate.name} (${sourate.arabicname})`;
+    
+    // Répète le texte 3 fois séparé par des •
+    const marqueeText = `${baseText} • ${baseText} • ${baseText}`;
+    marquee.textContent = marqueeText;
+    
+    // Ajuste la vitesse en fonction de la longueur
+    const textWidth = marquee.scrollWidth / 3; // Largeur d'une occurrence
+    const duration = Math.max(10, textWidth / 30); // 30px par seconde
+    
+    // Applique l'animation
+    marquee.style.animation = `marquee-step ${duration}s steps(${Math.floor(textWidth/10)}) infinite`;
+    
+    // Redémarre l'animation
+    marquee.style.animation = 'none';
+    void marquee.offsetWidth; // Force le reflow
+    marquee.style.animation = `marquee-step ${duration}s steps(${Math.floor(textWidth/10)}) infinite`;
+}
+
+// Fonction pour mettre à jour le temps
+function updateCurrentTime() {
+    if (currentAudio) {
+        const currentTimeMs = currentAudio.currentTime * 1000;
+        const seconds = Math.floor(currentTimeMs / 1000) % 60;
+        const minutes = Math.floor(currentTimeMs / (1000 * 60)) % 60;
+        const hours = Math.floor(currentTimeMs / (1000 * 60 * 60));
+        
+        document.getElementById('current-time').textContent = 
+            String(hours).padStart(2, '0') + ':' +
+            String(minutes).padStart(2, '0') + ':' +
+            String(seconds).padStart(2, '0');
+    }
+}
+
+// Fonction pour charger et jouer une sourate
+function loadAndPlaySourate(sheikh, sourateIndex) {
+    if (isLoadingSourate) return;
+    isLoadingSourate = true;
+
+    const sourate = sourates[sourateIndex];
+    currentSourateIndex = sourateIndex;
+    currentSurahText = null;
+    
+    // Arrêter tout surlignage en cours
+    if (currentHighlightInterval) {
+        clearInterval(currentHighlightInterval);
+        currentHighlightInterval = null;
+    }
+
+    loadJSON('./js/quran-com_timestamps.json')
+        .then(datta => {
+            if (datta[sheikh.name]) {
+                if (currentAudio) {
+                    currentAudio.pause();
+                    clearInterval(updateInterval);
+                }
+
+                const surahData = datta[sheikh.name][sourate.number];
+                const audioUrl = datta[sheikh.name][sourate.number]["audio_files"][0]["audio_url"];
+                currentSourateAudioUrl = audioUrl; // Stocker l'URL courante
+                
+                currentAudio = new Audio(audioUrl);
+                currentAudio.volume = currentVolume;
+                currentVerseTimings = surahData["audio_files"][0]["verse_timings"];
+
+                // Mise à jour UI
+                updateSourateName(sourate);
+                document.querySelector('.circular-btn').style.opacity = '1';
+                document.querySelectorAll('.details')[0].textContent = formatDuration(surahData["audio_files"][0]["duration"]);
+                document.querySelector('.source').onclick = () => window.open(audioUrl);
+                document.querySelectorAll('.details')[1].textContent = formatSize(surahData["audio_files"][0]["file_size"]);
+                
+                // Gestionnaire pour le début de lecture
+                const onAudioStarted = () => {
+                    // Vérifier qu'on a bien le bon audio (au cas où l'utilisateur change rapidement)
+                    if (currentAudio && currentAudio.src === currentSourateAudioUrl) {
+                        isPlaying = true;
+                        document.getElementById('play-pause').textContent = '[stop]';
+                        
+                        // Démarrer la mise à jour du temps
+                        updateInterval = setInterval(updateCurrentTime, 1000);
+                        
+                        // Démarrer le surlignage SEULEMENT maintenant
+                        currentHighlightInterval = setInterval(() => {
+                            highlightCurrentVerse();
+                        }, 200);
+                    }
+                };
+
+                // Gestionnaire pour la fin de lecture
+                currentAudio.onended = () => {
+                    clearInterval(updateInterval);
+                    clearInterval(currentHighlightInterval);
+
+                    const container = document.querySelector('.sourate-container');
+                    const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+
+                    if (isLoopMode) {
+                        currentAudio.currentTime = 0;
+                        currentAudio.play().then(onAudioStarted);
+                    } else if (isPlayAll && currentSourateIndex < sourates.length - 1) {
+                        if (container.style.opacity === '1') {
+                            container.style.transition = 'opacity 0.3s ease';
+                            container.style.opacity = '0';
+                            setTimeout(() => {
+                                loadAndPlaySourate(sheikh, currentSourateIndex + 1);
+                                loadSurahText(currentSourateIndex + 1).then(() => {
+                                    container.style.opacity = '1';
+                                });
+                            }, 300);
+                        } else {
+                            loadAndPlaySourate(sheikh, currentSourateIndex + 1);
+                        }
+                    } else if (isLearning && currentSourateIndex > 0) {
+                        if (container.style.opacity === '1') {
+                            container.style.transition = 'opacity 0.3s ease';
+                            container.style.opacity = '0';
+                            setTimeout(() => {
+                                loadAndPlaySourate(sheikh, currentSourateIndex - 1);
+                                loadSurahText(currentSourateIndex - 1).then(() => {
+                                    container.style.opacity = '1';
+                                });
+                            }, 300);
+                        } else {
+                            loadAndPlaySourate(sheikh, currentSourateIndex - 1);
+                        }
+                    } else {
+                        isPlayAll = false;
+                        isPlaying = false;
+                        document.getElementById('play-pause').textContent = '[play]';
+                    }
+                };
+
+                // Démarrer la lecture
+                currentAudio.play()
+                .then(() => {
+                    onAudioStarted();
+                    isLoadingSourate = false;
+                })
+                .catch(error => {
+                    console.error('Erreur de lecture:', error);
+                    isLoadingSourate = false;
+                });
+            }
+        })
+        .catch(error => console.error('Erreur lors du chargement du fichier JSON:', error));
+}
+
+
+function highlightCurrentVerse() {
+    if (!currentAudio || !currentVerseTimings || currentAudio.paused || currentAudio.src !== currentSourateAudioUrl) {
+        return;
+    }
+
+    const currentTime = currentAudio.currentTime * 1000; // en millisecondes
+    const verseTexts = document.querySelectorAll('.verse-text');
+
+    // Réinitialiser tout surlignage
+    verseTexts.forEach(v => {
+        v.innerHTML = v.textContent; // Supprime les balises <span>
+        v.style.backgroundColor = '';
+    });
+
+    for (let i = 0; i < currentVerseTimings.length; i++) {
+        const verseTiming = currentVerseTimings[i];
+
+        if (currentTime >= verseTiming.timestamp_from && currentTime <= verseTiming.timestamp_to) {
+            const verseNumber = parseInt(verseTiming.verse_key.split(':')[1]);
+            const verseElement = document.querySelector(`.verse[data-verse="${verseNumber}"] .verse-text`);
+
+            if (!verseElement || !verseTiming.segments) return;
+
+            const verseText = verseElement.textContent;
+            const words = verseText.trim().match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]+(?:\s*[ۛۖۚۗۙۘۜ۝۞])*/g); // séparation des mots
+            let highlightedHtml = '';
+            let segmentHighlighted = false;
+            // Défilement automatique
+            const container = document.querySelector('.surah-text-container');
+            if (container) {
+                const containerRect = container.getBoundingClientRect();
+                const verseRect = verseElement.getBoundingClientRect();
+                const buffer = 300; // Marge en pixels
+
+                let scrollOffset = 0;
+
+                if (verseRect.bottom > containerRect.bottom - buffer) {
+                    scrollOffset = verseRect.bottom - containerRect.bottom + buffer;
+                }
+
+                if (scrollOffset !== 0) {
+                    container.scrollTo({
+                        top: container.scrollTop + scrollOffset,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+
+
+            for (let j = 0; j < verseTiming.segments.length; j++) {
+                const segment = verseTiming.segments[j];
+                if (segment.length < 3) continue;
+
+                const [segmentIndex, from, to] = segment;
+                if (currentTime >= from && currentTime <= to) {
+                    const wordStart = segmentIndex - 1;
+                    const wordEnd = wordStart; // ou autre logique si plusieurs mots
+
+                    words.forEach((word, index) => {
+                        if (index === wordStart) {
+                            highlightedHtml += `<span style="background-color: rgba(200,200,200,0.3);">`;
+                        }
+
+                        highlightedHtml += word;
+
+                        if (index === wordEnd) {
+                            highlightedHtml += `</span>`;
+                        }
+
+                        if (index < words.length - 1) highlightedHtml += ' ';
+                    });
+
+                    verseElement.innerHTML = highlightedHtml;
+                    segmentHighlighted = true;
+                    break;
+                }
+            }
+
+            if (!segmentHighlighted) {
+                verseElement.innerHTML = words.join(' '); // pas de surlignage actif
+            }
+
+            return;
+        }
+    }
+}
+
+
+
+// Fonctions pour jouer suivant/précédent (version optimisée)
+function playNextSourate() {
+    const container = document.querySelector('.sourate-container');
+    const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+    
+    if (container.style.opacity === '1') {
+        if (currentSourateIndex < sourates.length - 1) {
+            // Transition visuelle
+            container.style.transition = 'opacity 0.3s ease';
+            container.style.opacity = '0';
+            
+            setTimeout(() => {
+                loadAndPlaySourate(sheikh, currentSourateIndex + 1);
+                loadSurahText(currentSourateIndex).then(() => {
+                    container.style.opacity = '1';
+                });
+            }, 300);
+        }
+    } else if (currentAudio) {
+        // Mode audio seul
+        currentAudio.pause();
+        if (currentSourateIndex < sourates.length - 1) {
+            loadAndPlaySourate(sheikh, currentSourateIndex + 1);
+        }
+    }
+}
+
+function playPrevSourate() {
+    const container = document.querySelector('.sourate-container');
+    const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+    
+    if (container.style.opacity === '1') {
+        if (currentSourateIndex > 0) {
+            container.style.transition = 'opacity 0.3s ease';
+            container.style.opacity = '0';
+            
+            setTimeout(() => {
+                loadAndPlaySourate(sheikh, currentSourateIndex - 1);
+                loadSurahText(currentSourateIndex).then(() => {
+                    container.style.opacity = '1';
+                });
+            }, 300);
+        }
+    } else if (currentAudio) {
+        currentAudio.pause();
+        if (currentSourateIndex > 0) {
+            loadAndPlaySourate(sheikh, currentSourateIndex - 1);
+        }
+    }
+}
+
+// Fonction pour charger le texte d'une sourate
+function loadSurahText(index) {
+    return new Promise((resolve, reject) => {
+        const surahNumber = String(index + 1);
+        
+        loadJSON(`./js/surah/${surahNumber}.json`)
+            .then(data => {
+                currentSurahText = data;
+                displaySurahText(currentSurahText);
+                resolve();
+            })
+            .catch(error => {
+                console.error("Erreur chargement texte sourate:", error);
+                reject(error);
+            });
+    });
+}
 
 // === Hacker effect pour les textes (conservé uniquement pour chargement initial) ===
 function hackerEffect(element, originalText, speed = 20, step = 3) {
@@ -28,11 +352,14 @@ function hackerEffect(element, originalText, speed = 20, step = 3) {
     }, speed);
 }
 
+
 function formatDuration(durationMs) {
     const seconds = Math.floor((durationMs / 1000) % 60);
     const minutes = Math.floor((durationMs / (1000 * 60)) % 60);
-    const hours = Math.floor((durationMs / (1000 * 60 * 60)) % 24);
-    return (hours > 0 ? String(hours).padStart(2, '0') + ':' : '') +
+    const hours = Math.floor((durationMs / (1000 * 60 * 60)));
+    
+    // Toujours afficher les heures, même si elles sont à 0
+    return String(hours).padStart(2, '0') + ':' +
            String(minutes).padStart(2, '0') + ':' +
            String(seconds).padStart(2, '0');
 }
@@ -51,6 +378,9 @@ function formatSize(size) {
 function createOverlay(data) {
     const overlay = document.createElement('div');
     overlay.className = 'sheikh-info';
+    overlay.style.display = 'block';
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'auto';
 
     const header = document.createElement('div');
     header.className = 'sheikh-header';
@@ -91,29 +421,15 @@ function createOverlay(data) {
     
     const playSpan = document.createElement('span');
     playSpan.className = 'action play';
-    playSpan.textContent = '[play]';
-    let isPlaying = false;
-
+    playSpan.textContent = '[all]';
     playSpan.onclick = () => {
-        if (isPlaying) {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
-                currentAudio = null;
-            }
-            playSpan.textContent = '[play]';
-            playSpan.appendChild(detailsDuration);
-            isPlaying = false;
-            return;
+        isPlayAll = !isPlayAll;
+        if (isPlayAll) {
+            playSpan.classList.add('active');
+        } else {
+            playSpan.classList.remove('active');
         }
-
-        if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
-        }
-
     };
-
     
     const detailsDuration = document.createElement('span');
     detailsDuration.className = 'details';
@@ -134,8 +450,59 @@ function createOverlay(data) {
     sourceSpan.appendChild(detailsSize);
 
     mediaInfo.appendChild(sourceSpan);
-    overlay.appendChild(mediaInfo);
 
+    const favoriteSpan = document.createElement('span');
+    favoriteSpan.className = 'fav';
+    // Récupérer la liste des favoris depuis les cookies
+    let favSheikhs = getCookie('favSheikhs');
+    favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+    const sheikhName = data.name;
+
+    if (favSheikhs.includes(sheikhName)) {
+        favoriteSpan.textContent = '[forget]';
+    }
+    else {
+        favoriteSpan.textContent = '[favorite]';
+    }
+
+    favoriteSpan.onclick = () => {
+        // Mettre à jour la liste des favoris lors du clic
+        let favSheikhs = getCookie('favSheikhs');
+        favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+        const sheikhName = data.name;
+
+        if (favSheikhs.includes(sheikhName)) {
+            // Supprimer des favoris
+            favSheikhs = favSheikhs.filter(s => s !== sheikhName);
+            favoriteSpan.classList.remove('active');
+            favoriteSpan.textContent = '[favorite]';
+        } else {
+            // Ajouter aux favoris
+            favSheikhs.push(sheikhName);
+            favoriteSpan.classList.add('active');
+            favoriteSpan.textContent = '[forget]';
+        }
+
+        setCookie('favSheikhs', JSON.stringify(favSheikhs));
+        updateSheikhHighlights(); // Cette ligne va maintenant aussi réorganiser le carrousel
+    };
+
+    mediaInfo.appendChild(favoriteSpan);
+
+    const learning = document.createElement('span');
+    learning.className = 'learning';
+    learning.textContent = '[learningPath]';
+    learning.onclick = () => {
+        isLearning = !isLearning;
+        if (isLearning) {
+            learning.classList.add('active');
+        } else {
+            learning.classList.remove('active');
+        }
+    };
+
+    mediaInfo.appendChild(learning);
+    overlay.appendChild(mediaInfo);
     
     const container = document.createElement('div');
     container.className = 'souratesContainer';
@@ -151,44 +518,8 @@ function createOverlay(data) {
                           <div class="sourate-arabic">${sourate.arabicname}</div>
         `;
         item.onclick = () => {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
-                currentAudio = null;
-                playSpan.textContent = '[play]';
-                playSpan.appendChild(detailsDuration);
-                isPlaying = false;
-            }
-        
-            loadJSON('./js/quran-com_timestamps.json') 
-                .then(datta => { 
-                    if (datta[data.name]) {
-                        const audioUrl = datta[data.name][sourate.number]["audio_files"][0]["audio_url"];
-                        currentAudio = new Audio(audioUrl);
-                        currentAudio.play();
-                        
-                        playSpan.textContent = '[stop]';
-                        playSpan.appendChild(detailsDuration);
-                        isPlaying = true;
-        
-                        currentAudio.onended = () => {
-                            playSpan.textContent = '[play]';
-                            playSpan.appendChild(detailsDuration);
-                            isPlaying = false;
-                        };
-        
-                        const durationMs = datta[data.name][sourate.number]["audio_files"][0]["duration"];
-                        detailsDuration.textContent = formatDuration(durationMs);
-                        detailsB = datta[data.name][sourate.number]["audio_files"][0]["file_size"];
-                        detailsSize.textContent = formatSize(detailsB);
-                        sourceSpan.onclick = () => {
-                            window.open(audioUrl);
-                        };
-                    } else {
-                        console.error('Erreur: Pas de données pour cette sourate');
-                    }
-                })
-                .catch(error => console.error('Erreur lors du chargement du fichier JSON:', error));
+            const sheikh = data;
+            loadAndPlaySourate(sheikh, sourates.indexOf(sourate));
         };
     
         list.appendChild(item);
@@ -198,30 +529,506 @@ function createOverlay(data) {
     return overlay;
 }
 
+async function toggleSheikhInfo() {
+    const sheikhInfo = document.querySelector('.sheikh-info');
+    const container = document.querySelector('.sourate-container');
+    
+    // Charger le texte de la sourate si nécessaire
+    if (!currentSurahText && currentSourateIndex !== undefined) {
+        try {
+            const surahNumber = String(currentSourateIndex + 1);
+            currentSurahText = await loadJSON(`./js/surah/${surahNumber}.json`);
+        } catch (error) {
+            console.error("Erreur chargement texte sourate:", error);
+            return;
+        }
+    }
+
+    if (sheikhInfo) {
+        if (sheikhInfo.style.opacity === '1') {
+            // Mode disparition
+            sheikhInfo.style.opacity = '0';
+            sheikhInfo.style.pointerEvents = 'none'; // Désactive les interactions
+            container.style.opacity = '1';
+            container.style.pointerEvents = 'auto'; // Réactive les interactions
+            displaySurahText(currentSurahText);
+            
+        } else {
+            // Mode apparition
+            sheikhInfo.style.display = 'block'; 
+            sheikhInfo.style.opacity = '1';
+            sheikhInfo.style.pointerEvents = 'auto';
+            container.style.opacity = '0';
+            container.style.pointerEvents = 'none';
+        }
+    }
+}
+
+function displaySurahText(surahData) {
+    const container = document.querySelector('.sourate-container');
+    container.innerHTML = ''; // Vide le conteneur
+    
+    const textContainer = document.createElement('div');
+    textContainer.className = 'surah-text-container';
+    textContainer.style.opacity = '0'; // Commence invisible
+    
+    // Titre de la sourate avec animation
+    const title = document.createElement('h3');
+    title.textContent = `${surahData.index}. ${sourates[surahData.index - 1].name} - ${sourates[surahData.index - 1].arabicname}`;
+    textContainer.appendChild(title);
+
+    // Création des versets
+    for (let i = 1; i <= surahData.count; i++) {
+        const verseKey = `verse_${i}`;
+        if (surahData.verse[verseKey]) {
+            const verseElement = document.createElement('div');
+            verseElement.className = 'verse';
+            verseElement.dataset.verse = i;
+            verseElement.style.opacity = '0'; // Commence invisible
+            verseElement.style.transition = `opacity 0.2s ease ${i * 0.05}s`; // Animation en cascade
+
+            const verseText = document.createElement('span');
+            verseText.className = 'verse-text';
+            verseText.textContent = surahData.verse[verseKey];
+
+            const verseNumber = document.createElement('span');
+            verseNumber.className = 'verse-number';
+            verseNumber.textContent = ' ' + i;
+
+            verseElement.appendChild(verseText);
+            verseElement.appendChild(verseNumber);
+            textContainer.appendChild(verseElement);
+        }
+    }
+
+    container.appendChild(textContainer);
+    
+    // Animation d'apparition
+    setTimeout(() => {
+        textContainer.style.transition = 'opacity 0.3s ease';
+        textContainer.style.opacity = '1';
+        
+        // Animation des versets en cascade
+        const verses = textContainer.querySelectorAll('.verse');
+        verses.forEach(verse => {
+            verse.style.opacity = '1';
+        });
+    }, 10);
+}
+
+
+document.querySelector('.circular-btn').addEventListener('click', toggleSheikhInfo);
+
+window.addEventListener("DOMContentLoaded", () => {
+    const welcomeMessage = document.getElementById('welcome-message');
+
+    const originalText = welcomeMessage.textContent;
+    welcomeMessage.textContent = "";
+    hackerEffect(welcomeMessage, originalText);
+
+    setTimeout(() => {
+        welcomeMessage.style.display = 'none';
+    }, 3000);
+
+    setTimeout(() => {
+        const newText = "Select your Sheikh to start:";
+        welcomeMessage.textContent = "";
+        welcomeMessage.style.display = 'block';
+        hackerEffect(welcomeMessage, newText);
+        welcomeMessage.classList.add('up');
+    }, 3000);
+
+    const carouselList = document.getElementById('sheikh-carousel');
+    const welcomeScreen = document.querySelector('.welcome-screen');
+    setTimeout(() => {
+        carouselList.classList.add('fade-in-up');
+        welcomeScreen.classList.add('fade-in');
+    }, 3500);
+
+});
+
+
+// === Initialisation du carrousel ===
+document.addEventListener("DOMContentLoaded", () => {
+    const carouselList = document.getElementById('sheikh-carousel');
+    
+    // Récupérer les sheikhs favoris depuis les cookies
+    let favSheikhs = getCookie('favSheikhs');
+    favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+
+    // Trier les sheikhs pour mettre les favoris en premier
+    const sortedSheikhs = [...sheikhs].sort((a, b) => {
+        const aIsFav = favSheikhs.includes(a.name);
+        const bIsFav = favSheikhs.includes(b.name);
+        
+        if (aIsFav && !bIsFav) return -1;
+        if (!aIsFav && bIsFav) return 1;
+        return 0;
+    });
+
+    // Créer les éléments du carrousel pour chaque sheikh (dans l'ordre trié)
+    sortedSheikhs.forEach((sheikh, index) => {
+        const carouselItem = document.createElement('li');
+        carouselItem.className = 'carousel__item';
+        carouselItem.tabIndex = 0;
+        carouselItem.dataset.index = index; // Garder l'index original
+        if (index == 0) carouselItem.setAttribute('data-active', 'true');
+
+        carouselItem.innerHTML = `
+            <div class="carousel__box">
+                <div class="carousel__image">
+                    <img src="${sheikh.photo}" width="480" height="720" alt="${sheikh.name}">
+                </div>
+                <div class="carousel__contents">
+                    <h2 class="sheikh__name">${sheikh.name}</h2>
+                </div>
+            </div>
+        `;
+        
+        carouselList.appendChild(carouselItem);
+    });
+
+    // Initialiser la logique du carrousel
+    initCarouselLogic();
+});
+
+function initCarouselLogic() {
+    const d = document;
+    const $q = d.querySelectorAll.bind(d);
+    const $g = d.querySelector.bind(d);
+    const $prev = $g(".prev");
+    const $next = $g(".next");
+    const $list = $g(".carousel__list");
+    let auto;
+    let pauser;
+
+    const getActiveIndex = () => {
+        const $active = $g("[data-active]");
+        return getSlideIndex($active);
+    };
+
+    const getSlideIndex = ($slide) => {
+        return [...$q(".carousel__item")].indexOf($slide);
+    };
+
+    const prevSlide = () => {
+        const index = getActiveIndex();
+        const $slides = $q(".carousel__item");
+        const $last = $slides[$slides.length - 1];
+        $last.remove();
+        $list.prepend($last);
+        activateSlide($q(".carousel__item")[index]);
+    };
+
+    const nextSlide = () => {
+        const index = getActiveIndex();
+        const $slides = $q(".carousel__item");
+        const $first = $slides[0];
+        $first.remove();
+        $list.append($first);
+        activateSlide($q(".carousel__item")[index]);
+    };
+
+    const activateSlide = ($slide) => {
+        if (!$slide) return;
+        const $slides = $q(".carousel__item");
+        $slides.forEach((el) => el.removeAttribute("data-active"));
+        $slide.setAttribute("data-active", true);
+        $slide.focus();
+    };
+
+    const autoSlide = () => {
+        nextSlide();
+    };
+
+    const pauseAuto = () => {
+        clearInterval(auto);
+        clearTimeout(pauser);
+    };
+
+    const handleNextClick = (e) => {
+        pauseAuto();
+        nextSlide(e);
+    };
+
+    const handlePrevClick = (e) => {
+        pauseAuto();
+        prevSlide(e);
+    };
+
+    const handleSlideClick = (e) => {
+        pauseAuto();
+        const $slide = e.target.closest(".carousel__item");
+        if (!$slide) return;
+
+        const index = parseInt($slide.dataset.index, 10);
+
+        const isActive = $slide.hasAttribute("data-active");
+
+        if (isActive) {
+            // Sélection directe : on anime les autres
+            const slides = [...document.querySelectorAll(".carousel__item")];
+            const middleIndex = Math.floor(slides.length / 2);
+
+            slides.forEach((slide, i) => {
+                if (i < middleIndex) {
+                    slide.classList.add("exit-left");
+                } else if (i > middleIndex) {
+                    slide.classList.add("exit-right");
+                }
+                // le Sheikh sélectionné reste sans classe
+            });
+
+            // Attend la fin de l'animation avant d'initialiser
+            if (!window.isSheikhInitializing) {
+                window.isSheikhInitializing = true;
+                setTimeout(() => {
+                    initializeSheikh(index);
+                    window.isSheikhInitializing = false;
+                }, 500); // durée identique à l'animation CSS
+            }
+        } else {
+            // Recentrer ce Sheikh
+            const slides = [...document.querySelectorAll(".carousel__item")];
+            const middleIndex = Math.floor(slides.length / 2);
+            const currentIndexInDOM = slides.indexOf($slide);
+            const offset = currentIndexInDOM - middleIndex;
+
+            if (offset > 0) {
+                for (let i = 0; i < offset; i++) nextSlide();
+            } else {
+                for (let i = 0; i < Math.abs(offset); i++) prevSlide();
+            }
+
+            // Activer celui qui est maintenant au centre
+            const newCenter = document.querySelectorAll(".carousel__item")[middleIndex];
+            activateSlide(newCenter);
+        }
+    };
+
+    const handleSlideKey = (e) => {
+    switch (e.keyCode) {
+        case 37: // Left arrow
+        case 65: // 'A' key
+        handlePrevClick();
+        break;
+        case 39: // Right arrow
+        case 68: // 'D' key
+        handleNextClick();
+        break;
+        case 13: // Enter key
+        const $slide = e.target.closest(".carousel__item");
+        if ($slide) {
+            handleSlideClick({ target: $slide });
+        }
+        break;
+    }
+    };
+
+    const startAuto = () => {
+        auto = setInterval(autoSlide, 3000);
+    };
+
+    setTimeout(() => {
+        startAuto();
+    }, 3000);
+
+    // === Activer le slide du milieu au chargement ===
+    const slides = [...$q(".carousel__item")];
+    const middleIndex = Math.floor(slides.length / 2);
+    const offset = 0 - middleIndex; // car tu veux que le slide d'indice 0 soit au milieu
+
+    if (offset > 0) {
+        for (let i = 0; i < offset; i++) nextSlide();
+    } else {
+        for (let i = 0; i < Math.abs(offset); i++) prevSlide();
+    }
+
+    const newCenter = $q(".carousel__item")[middleIndex];
+    activateSlide(newCenter);
+
+
+    $list.addEventListener("keydown", handleSlideKey);
+    $list.addEventListener("click", handleSlideClick);
+    $prev.addEventListener("click", handlePrevClick);
+    $next.addEventListener("click", handleNextClick);
+    $list.addEventListener("focusin", handleSlideClick);
+}
+
+// Fonction pour afficher les stats
+async function displaySheikhStats(sheikhName) {
+    // Vérifier le cache d'abord
+    if (statsCache[sheikhName]) {
+        updateStatsUI(statsCache[sheikhName]);
+        return;
+    }
+    // Détruire le worker précédent s'il existe
+    if (statsWorker) {
+        statsWorker.terminate();
+    }
+    
+    // Créer un nouveau worker
+    statsWorker = new Worker('./js/statsWorker.js');
+    
+    // Afficher un indicateur de chargement
+    document.getElementById('heures').textContent = '// ...';
+    document.getElementById('minutes').textContent = '// ...';
+    document.getElementById('secondes').textContent = '// ...';
+    
+    statsWorker.onmessage = function(e) {
+        const stats = e.data;
+        if (!stats) return;
+        
+        // Mettre en cache
+        statsCache[sheikhName] = stats;
+        updateStatsUI(stats);
+        
+        // Terminer le worker
+        statsWorker.terminate();
+        statsWorker = null;
+    };
+    
+    // Démarrer le calcul
+    statsWorker.postMessage({ sheikhName });
+}
+
+function updateStatsUI(stats) {
+    document.getElementById('heures').textContent = '// ' + stats.hours;
+    document.getElementById('minutes').textContent = '// ' + stats.minutes;
+    document.getElementById('secondes').textContent = '// ' + stats.seconds;
+}
+
+
+// Fonction pour initialiser l'écran principal avec le Sheikh sélectionné
+window.initializeSheikh = function (index) {
+    let favSheikhs = getCookie('favSheikhs');
+    favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+
+    const sortedSheikhs = [...sheikhs].sort((a, b) => {
+        const aIsFav = favSheikhs.includes(a.name);
+        const bIsFav = favSheikhs.includes(b.name);
+        
+        if (aIsFav && !bIsFav) return -1;
+        if (!aIsFav && bIsFav) return 1;
+        return 0;
+    });
+
+    const sheikh = sortedSheikhs[index];
+    displaySheikhStats(sheikh.name);
+
+    const welcomeMessage = document.querySelector('.welcome-message.up');
+    const welcomeScreen = document.querySelector('.welcome-screen');
+    const mainScreen = document.getElementById('main-screen');
+
+    const activeSlide = document.querySelector('[data-active]');
+
+    // === Cloner l'image ===
+    const sheikhImg = activeSlide.querySelector('img');
+    const imgRect = sheikhImg.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(sheikhImg);
+
+    const imgClone = sheikhImg.cloneNode(true);
+    imgClone.style.position = 'fixed';
+    imgClone.style.top = imgRect.top + 'px';
+    imgClone.style.left = imgRect.left + 'px';
+    imgClone.style.width = imgRect.width + 'px';
+    imgClone.style.height = imgRect.height + 'px';
+    imgClone.style.zIndex = '9999';
+    imgClone.style.transition = 'all 0.8s ease-in-out';
+
+    // 🧪 Copier les styles visuels
+    imgClone.style.boxShadow = computedStyle.boxShadow;
+    imgClone.style.objectFit = computedStyle.objectFit;
+    imgClone.style.filter = computedStyle.filter;
+    imgClone.style.opacity = computedStyle.opacity;
+    imgClone.style.borderRadius = '16px';
+
+    document.body.appendChild(imgClone);
+
+
+    // Cacher temporairement menuL et menuR
+    const menuL = document.querySelector('.menuL');
+    const menuR = document.querySelector('.menuR');
+    menuL.style.opacity = '0';
+    menuR.style.opacity = '0';
+
+    // === Fade-out de l'écran de bienvenue ===
+    welcomeMessage.classList.add('fade-out');
+
+    setTimeout(() => {
+        welcomeMessage.remove();
+        welcomeScreen.remove();
+
+        mainScreen.style.display = 'block';
+
+        const currentOverlay = document.querySelector('.sheikh-info');
+        let newOverlay = createOverlay(sheikh);
+        newOverlay.style.opacity = '0'; // On cache
+        document.body.appendChild(newOverlay);
+
+        // === Transition de l'image ===
+        const targetImg = newOverlay.querySelector('img');
+        const targetRect = targetImg.getBoundingClientRect();
+
+        requestAnimationFrame(() => {
+            imgClone.style.top = targetRect.top + 'px';
+            imgClone.style.left = targetRect.left + 'px';
+            imgClone.style.width = targetRect.width + 'px';
+            imgClone.style.height = targetRect.height + 'px';
+        });
+
+        // === Une fois l'image en place ===
+        setTimeout(() => {
+            // 🆕 Afficher doucement menuL et menuR
+            menuL.style.transition = 'opacity 0.4s ease';
+            menuR.style.transition = 'opacity 0.4s ease';
+            menuL.style.opacity = '1';
+            menuR.style.opacity = '1';
+
+            imgClone.remove();
+            newOverlay.style.transition = 'opacity 0.4s ease';
+            newOverlay.style.opacity = '1';
+
+        }, 800);
+
+        // Active the menu item whose text matches the selected sheikh's name
+        const sheikhName = document.querySelector('.sheikh-name')?.textContent;
+        document.querySelectorAll('.menu-item').forEach(item => {
+            if (item.textContent === sheikhName) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
+    }, 500);
+};
+
+
 
 // === Animation en cascade à la fin du chargement (uniquement pour textes initiaux) ===
 window.addEventListener("DOMContentLoaded", () => {
-    const elements = Array.from(document.body.querySelectorAll("*"))
-        .filter(el =>
-            el.childNodes.length === 1 &&
-            el.childNodes[0].nodeType === Node.TEXT_NODE &&
-            el.textContent.trim().length > 0
-        );
-
-    elements.forEach((el, index) => {
-        const text = el.textContent;
-        el.textContent = "";
-
-        setTimeout(() => {
-            hackerEffect(el, text);
-        }, index * 100);
-    });
 
     // Génère le menu une fois que le DOM est prêt
     const menu = document.getElementById('menuR');
-    sheikhs.sort((a, b) => a.name.localeCompare(b.name)); // Trie les sheikhs par ordre alphabétique
+    const copieSheikhs = [...sheikhs];
+    
+    // Trie les sheikhs : si pas de favoris, ordre alphabétique ; sinon, favoris d'abord puis alphabétique
+    let favSheikhs = getCookie('favSheikhs');
+    favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+    if (favSheikhs.length === 0) {
+        copieSheikhs.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+        copieSheikhs.sort((a, b) => {
+            const aIsFav = favSheikhs.includes(a.name);
+            const bIsFav = favSheikhs.includes(b.name);
+            if (aIsFav && !bIsFav) return -1;
+            if (!aIsFav && bIsFav) return 1;
+            return a.name.localeCompare(b.name);
+        });
+    }
 
-    sheikhs.forEach((sheikh) => {
+    copieSheikhs.forEach((sheikh) => {
         const div = document.createElement('div');
         div.className = 'menu-item';
         div.textContent = sheikh.name;
@@ -239,170 +1046,97 @@ window.addEventListener("DOMContentLoaded", () => {
             } else {
                 document.body.appendChild(createOverlay(sheikh));
             }
+
+            const container = document.querySelector('.sourate-container');
+            if (current.style.opacity === '0') {
+                current.style.display = 'block'; 
+                current.style.opacity = '1';
+                current.style.pointerEvents = 'auto';
+                container.style.opacity = '0';
+                container.style.pointerEvents = 'none';
+            }
+
+            displaySheikhStats(sheikh.name);
         };
         menu.appendChild(div);
-    });
-});
-
-// === Initialisation du carrousel ===
-document.addEventListener("DOMContentLoaded", () => {
-    const carouselList = document.getElementById('sheikh-carousel');
-    
-    // Créer les éléments du carrousel pour chaque sheikh
-    sheikhs.forEach((sheikh, index) => {
-        const carouselItem = document.createElement('li');
-        carouselItem.className = 'carousel__item';
-        carouselItem.tabIndex = 0;
-        if (index === 0) carouselItem.setAttribute('data-active', 'true');
-        
-        carouselItem.innerHTML = `
-            <div class="carousel__box">
-                <div class="carousel__image">
-                    <img src="${sheikh.photo}" width="480" height="720" alt="${sheikh.name}">
-                </div>
-                <div class="carousel__contents">
-                    <h2 class="sheikh__name">${sheikh.name}</h2>
-                </div>
-            </div>
-        `;
-        
-        carouselItem.addEventListener('click', () => {
-            initializeSheikh(index);
-        });
-        
-        carouselList.appendChild(carouselItem);
+        updateSheikhHighlights();
     });
 
-    // Initialiser la logique du carrousel
-    initCarouselLogic();
 });
 
-function initCarouselLogic() {
-    const d = document;
-    const $q = d.querySelectorAll.bind(d);
-    const $g = d.querySelector.bind(d);
-    const $list = $g(".carousel__list");
-    let auto;
-    let pauser;
+// Gestion des événements
+document.getElementById('play-pause').addEventListener('click', () => {
+    if (currentAudio) {
+        if (isPlaying) {
+            currentAudio.pause();
+            isPlaying = false;
+            document.getElementById('play-pause').textContent = '[play]';
+            clearInterval(updateInterval);
+            clearInterval(currentHighlightInterval); // Ajoute ceci aussi
+        } else {
+            currentAudio.currentTime = 0; // facultatif : remettre au début
+            currentAudio.play()
+                .then(() => {
+                    isPlaying = true;
+                    document.getElementById('play-pause').textContent = '[stop]';
+                    updateInterval = setInterval(updateCurrentTime, 1000);
 
-    const getActiveIndex = () => {
-    const $active = $g("[data-active]");
-    return getSlideIndex($active);
-    };
-
-    const getSlideIndex = ($slide) => {
-    return [...$q(".carousel__item")].indexOf($slide);
-    };
-
-    const prevSlide = () => {
-    const index = getActiveIndex();
-    const $slides = $q(".carousel__item");
-    const $last = $slides[$slides.length - 1];
-    $last.remove();
-    $list.prepend($last);
-    activateSlide($q(".carousel__item")[index]);
-    };
-    const nextSlide = () => {
-    const index = getActiveIndex();
-    const $slides = $q(".carousel__item");
-    const $first = $slides[0];
-    $first.remove();
-    $list.append($first);
-    activateSlide($q(".carousel__item")[index]);
-    };
-
-    const chooseSlide = (e) => {
-    const max = window.matchMedia("screen and ( max-width: 600px)").matches
-        ? 5
-        : 8;
-    const $slide = e.target.closest(".carousel__item");
-    const index = getSlideIndex($slide);
-    if (index < 3 || index > max) return;
-    if (index === max) nextSlide();
-    if (index === 3) prevSlide();
-    activateSlide($slide);
-    };
-
-    const activateSlide = ($slide) => {
-    if (!$slide) return;
-    const $slides = $q(".carousel__item");
-    $slides.forEach((el) => el.removeAttribute("data-active"));
-    $slide.setAttribute("data-active", true);
-    $slide.focus();
-    };
-
-    const autoSlide = () => {
-    nextSlide();
-    };
-
-    const pauseAuto = () => {
-    clearInterval(auto);
-    clearTimeout(pauser);
-    };
-
-    const handleNextClick = (e) => {
-    pauseAuto();
-    nextSlide(e);
-    };
-
-    const handlePrevClick = (e) => {
-    pauseAuto();
-    prevSlide(e);
-    };
-
-    const handleSlideClick = (e) => {
-    pauseAuto();
-    chooseSlide(e);
-    };
-
-    const handleSlideKey = (e) => {
-    switch (e.keyCode) {
-        case 37:
-        case 65:
-        handlePrevClick();
-        break;
-        case 39:
-        case 68:
-        handleNextClick();
-        break;
+                    // 💡 Ajout pour relancer le surlignage
+                    if (currentHighlightInterval) clearInterval(currentHighlightInterval);
+                        currentHighlightInterval = setInterval(() => {
+                            highlightCurrentVerse();
+                        }, 200);
+                });
+        }
     }
-    };
-
-    const startAuto = () => {
-    auto = setInterval(autoSlide, 3000);
-    };
-
-    startAuto();
-
-    // === Activer le slide du milieu au chargement ===
-    const initialSlide = $q(".carousel__item")[Math.floor($q(".carousel__item").length / 2)];
-    activateSlide(initialSlide);
+});
 
 
-    $list.addEventListener("focusin", handleSlideClick);
-    $list.addEventListener("keyup", handleSlideKey);
-}
+document.getElementById('next-sourate').addEventListener('click', playNextSourate);
+document.getElementById('prev-sourate').addEventListener('click', playPrevSourate);
 
-// Fonction pour initialiser l'écran principal avec le Sheikh sélectionné
-window.initializeSheikh = function (index) {
-    const sheikh = sheikhs[index];
-    console.log('Selected Sheikh:', sheikh.name);
-    document.querySelector('.welcome-screen').style.display = 'none';
-    document.getElementById('main-screen').style.display = 'block';
-    
-    // Active l'élément du menu correspondant
-    const menuItems = document.querySelectorAll('.menu-item');
-    menuItems.forEach(item => item.classList.remove('active'));
-    menuItems[index].classList.add('active');
-    
-    // Affiche les informations du sheikh
-    const currentOverlay = document.querySelector('.sheikh-info');
-    if (currentOverlay) {
-        currentOverlay.replaceWith(createOverlay(sheikh));
-    } else {
-        document.body.appendChild(createOverlay(sheikh));
+document.getElementById('forward-30').addEventListener('click', () => {
+    if (currentAudio) {
+        currentAudio.currentTime = Math.min(currentAudio.currentTime + 30, currentAudio.duration);
+        updateCurrentTime();
     }
-};
+});
+
+document.getElementById('backward-30').addEventListener('click', () => {
+    if (currentAudio) {
+        currentAudio.currentTime = Math.max(currentAudio.currentTime - 30, 0);
+        updateCurrentTime();
+    }
+});
+
+document.getElementById('volume-up').addEventListener('click', () => {
+    currentVolume = Math.min(currentVolume + 0.1, 1.0);
+    if (currentAudio) currentAudio.volume = currentVolume;
+    const percent = Math.round(currentVolume * 100);
+    document.getElementById('volume-level').textContent = 
+    `${percent}%`.length === 3 ? `${percent}%` : ` ${percent}%`;
+});
+
+document.getElementById('volume-down').addEventListener('click', () => {
+    currentVolume = Math.max(currentVolume - 0.1, 0);
+    if (currentAudio) currentAudio.volume = currentVolume;
+    const percent = Math.round(currentVolume * 100);
+    document.getElementById('volume-level').textContent = 
+    `${percent}%`.length === 3 ? `${percent}%` : ` ${percent}%`;
+});
+
+document.getElementById('loop-mode').addEventListener('click', () => {
+    const Item = document.getElementById('loop-mode').textContent = '[loop]';
+    const activeItem = document.querySelector('.control-btn.active');
+    if (activeItem) {
+        activeItem.classList.remove('active');
+        isLoopMode = false;
+    }
+    else {
+        document.getElementById('loop-mode').classList.add('active');
+        isLoopMode = true;
+    }
+});
 
 
 // === Liste des sheikhs ===
@@ -596,12 +1330,63 @@ function loadJSON(url) {
         });
 }
 
-  
-
 // Fonction pour jouer l'audio
 function playAudio(audioUrl) {
     const audio = new Audio(audioUrl);
     audio.play()
         .then(() => console.log('Lecture de l\'audio lancée!'))
         .catch(error => console.log('Erreur de lecture audio: ', error));
+}
+
+  
+function setCookie(name, value, days = 365) {
+    const expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + expires + '; path=/';
+}
+
+function getCookie(name) {
+    return document.cookie.split('; ').reduce((r, v) => {
+        const parts = v.split('=');
+        return parts[0] === name ? decodeURIComponent(parts[1]) : r;
+    }, '');
+}
+
+function updateSheikhHighlights() {
+    const favSheikhs = getCookie('favSheikhs');
+    const oKCookie = getCookie('oKCookie');
+
+    if (!oKCookie) {
+        showCookieAlert();
+        return;
+    }
+
+    const favList = favSheikhs ? JSON.parse(favSheikhs) : [];
+
+    // 1. Mettre à jour le menu
+    document.querySelectorAll('.menu-item').forEach(item => {
+        const sheikhName = item.textContent;
+        item.classList.toggle('highlight', favList.includes(sheikhName));
+    });
+}
+
+function showCookieAlert() {
+    if (document.getElementById('cookie-alert')) return; // éviter les doublons
+
+    const alert = document.createElement('div');
+    alert.id = 'cookie-alert';
+
+    const menuL = document.querySelector('.menuL');
+    alert.innerHTML = `
+        <div style="margin-top: 1em; color: #dddd25;">
+            Do you know cookies are a thing?<br>
+            <span id="ack-cookies" style="cursor: pointer;">[yes I'm aware]</span>
+        </div>
+    `;
+    menuL.appendChild(alert);
+
+    document.getElementById('ack-cookies').addEventListener('click', () => {
+        setCookie('oKCookie', 'whatever');
+        alert.remove();
+        updateSheikhHighlights(); // met à jour les highlights après acceptation
+    });
 }
