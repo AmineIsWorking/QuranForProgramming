@@ -1,39 +1,53 @@
 // statsWorker.js
 self.onmessage = async function(e) {
-    const { sheikhName } = e.data;
+    const { filename } = e.data;  // On reçoit directement le filename
     
     try {
-        const response = await fetch('https://github.com/amineisworking/QuranForProgramming/releases/download/v1.0.0/quran-com_timestamps.json');
-        const data = await response.json();
-        const sheikhData = data[sheikhName];
-        
-        if (!sheikhData) {
-            postMessage(null);
-            return;
+        // Charger le fichier spécifique au sheikh
+        const response = await fetch(`./sheikhs/${filename}`);
+        if (!response.ok) {
+            throw new Error(`Fichier non trouvé: ${filename}`);
         }
-
-        let totalDurationMs = 0;
         
+        const sheikhData = await response.json();
+        
+        let totalDurationMs = 0;
+        let sourateCount = 0;
+        
+        // Calculer la durée totale et le nombre de sourates
         for (const sourateNum in sheikhData) {
-            const audioFiles = sheikhData[sourateNum].audio_files;
-            if (audioFiles && audioFiles.length > 0) {
-                totalDurationMs += audioFiles[0].duration;
+            if (sheikhData[sourateNum]?.audio_files?.[0]?.duration) {
+                totalDurationMs += sheikhData[sourateNum].audio_files[0].duration;
+                sourateCount++;
             }
         }
         
+        // Calculer les composants temporels
         const totalSeconds = Math.floor(totalDurationMs / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
         
+        // Envoyer les résultats
         postMessage({
             duration: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
             hours,
             minutes,
-            seconds
+            seconds,
+            sourateCount,
+            fileSize: (response.headers.get('Content-Length') || '0') + ' octets'
         });
+        
     } catch (error) {
-        console.error("Erreur calcul stats:", error);
-        postMessage(null);
+        console.error("Erreur dans le worker:", {
+            error: error.message,
+            filename
+        });
+        
+        postMessage({
+            error: true,
+            message: "Erreur de calcul des statistiques",
+            details: error.message
+        });
     }
 };

@@ -66,16 +66,17 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
         currentHighlightInterval = null;
     }
 
-    loadJSON('https://github.com/amineisworking/QuranForProgramming/releases/download/v1.0.0/quran-com_timestamps.json')
-        .then(datta => {
-            if (datta[sheikh.name]) {
+    // Charger le fichier JSON spécifique au sheikh
+    loadSheikhData(sheikh)
+        .then(sheikhData => {
+            if (sheikhData && sheikhData[sourate.number]) {
                 if (currentAudio) {
                     currentAudio.pause();
                     clearInterval(updateInterval);
                 }
 
-                const surahData = datta[sheikh.name][sourate.number];
-                const audioUrl = datta[sheikh.name][sourate.number]["audio_files"][0]["audio_url"];
+                const surahData = sheikhData[sourate.number];
+                const audioUrl = surahData["audio_files"][0]["audio_url"];
                 currentSourateAudioUrl = audioUrl; // Stocker l'URL courante
                 
                 currentAudio = new Audio(audioUrl);
@@ -856,12 +857,14 @@ function initCarouselLogic() {
 }
 
 // Fonction pour afficher les stats
-async function displaySheikhStats(sheikhName) {
+// Fonction pour afficher les stats
+async function displaySheikhStats(sheikh) {  // On passe l'objet sheikh complet
     // Vérifier le cache d'abord
-    if (statsCache[sheikhName]) {
-        updateStatsUI(statsCache[sheikhName]);
+    if (statsCache[sheikh.name]) {
+        updateStatsUI(statsCache[sheikh.name]);
         return;
     }
+
     // Détruire le worker précédent s'il existe
     if (statsWorker) {
         statsWorker.terminate();
@@ -877,10 +880,10 @@ async function displaySheikhStats(sheikhName) {
     
     statsWorker.onmessage = function(e) {
         const stats = e.data;
-        if (!stats) return;
+        if (!stats || stats.error) return;
         
         // Mettre en cache
-        statsCache[sheikhName] = stats;
+        statsCache[sheikh.name] = stats;
         updateStatsUI(stats);
         
         // Terminer le worker
@@ -888,8 +891,10 @@ async function displaySheikhStats(sheikhName) {
         statsWorker = null;
     };
     
-    // Démarrer le calcul
-    statsWorker.postMessage({ sheikhName });
+    // Démarrer le calcul avec le filename exact
+    statsWorker.postMessage({ 
+        filename: sheikh.filename  // On utilise directement le champ filename
+    });
 }
 
 function updateStatsUI(stats) {
@@ -914,7 +919,7 @@ window.initializeSheikh = function (index) {
     });
 
     const sheikh = sortedSheikhs[index];
-    displaySheikhStats(sheikh.name);
+    displaySheikhStats(sheikh);
 
     const welcomeMessage = document.querySelector('.welcome-message.up');
     const welcomeScreen = document.querySelector('.welcome-screen');
@@ -1056,7 +1061,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 container.style.pointerEvents = 'none';
             }
 
-            displaySheikhStats(sheikh.name);
+            displaySheikhStats(sheikh);
         };
         menu.appendChild(div);
         updateSheikhHighlights();
@@ -1143,54 +1148,63 @@ document.getElementById('loop-mode').addEventListener('click', () => {
 const sheikhs = [
     {
         name: "Mishari Rashid al-`Afasy",
+        filename: "Mishari_Rashid_al_Afasy.json",
         photo: "./assets/images/Mishary-Rashid-Alafasy.jpeg",
         bio: "Mishary Rashid Alafasy, du Koweït, est mondialement reconnu pour sa voix apaisante et sa récitation émotive du Coran. Il a fondé la première chaîne de télévision entièrement dédiée à la récitation du Coran. Il est aussi le premier réciteur à avoir enregistré le Coran en entier dans les dix lectures (qira'at).",
         audio: "https://server.com/audio/"
     },
     {
         name: "Mahmoud Khalil Al-Husary",
+        filename: "Mahmoud_Khalil_Al_Husary.json",
         photo: "./assets/images/Mahmoud-Khalil-Al-Husary.jpeg",
         bio: "Mahmoud Khalil Al-Husary, un maître égyptien du tajwid, est connu pour sa récitation claire et méthodique. Il a été le premier réciteur à enregistrer le Coran complet en plusieurs styles de récitation, ce qui a grandement contribué à l'apprentissage du Coran dans le monde entier.",
         audio: "https://server.com/audio/"
     },
     {
         name: "Sa'ud ash-Shuraim",
+        filename: "Saud_ash_Shuraim.json",
         photo: "./assets/images/Saud-ash-Shuraim.jpeg",
         bio: "Saad Al-Ghamdi a mémorisé le Coran à l'âge de 22 ans et a ensuite étudié les dix lectures (al-qira'at al-‘ashr). Son enregistrement complet du Coran est l’un des plus utilisés dans les écoles coraniques du monde pour son style clair et parfait pour l’apprentissage.",
         audio: "https://server.com/audio/"
     },
     {
         name: "AbdulBaset AbdulSamad",
+        filename: "AbdulBaset_AbdulSamad.json",
         photo: "./assets/images/Abdul-Basit-Abdus-Samad.jpeg",
         bio: "Abdul Basit Abdus Samad, légende égyptienne du tajwid, est le seul réciteur à avoir conquis le cœur de millions dans le monde entier sans aucun média moderne à l’époque. Il a récité le Coran à l’ONU en 1970, un événement marquant où plusieurs non-musulmans furent émus aux larmes par sa récitation.",
         audio: "https://server.com/audio/"
     },
     {
         name: "Abu Bakr al-Shatri",
+        filename: "Abu_Bakr_al_Shatri.json",
         photo: "./assets/images/Abu-Bakr-al-Shatri.webp",
         bio: "Abu Bakr al-Shatri, connu pour sa récitation douce et mélodieuse, est un réciteur saoudien très apprécié. Il a participé à de nombreux événements islamiques internationaux et est souvent invité à diriger les prières dans différentes mosquées à travers le monde.",
         audio: "https://server.com/audio/"
     },
     {
         name: "Khalifah Al Tunaiji",
+        filename: "Khalifah_Al_Tunaiji.json",
         photo: "./assets/images/Khalifa-al-Tunaiji.jpeg",
         bio: "Khalifah Al Tunaiji, originaire des Émirats arabes unis, est connu pour sa récitation captivante et son engagement dans l'enseignement du Coran. Il a inspiré de nombreux étudiants à travers ses programmes éducatifs et ses récitations.",
         audio: "https://server.com/audio/"
     },
     {
         name: "Hani ar-Rifai",
+        filename: "Hani_ar_Rifai.json",
         photo: "./assets/images/Hani-ar-Rifai.jpeg",
         bio: "Hani ar-Rifai, imam de la mosquée Anani à Jeddah, est célèbre pour ses récitations émouvantes et ses dou’as pleines de ferveur. Sa voix unique a touché le cœur de millions de fidèles à travers le monde.",
         audio: "https://server.com/audio/"
     },
     {
         name: "Mohamed Siddiq al-Minshawi",
+        filename: "Mohamed_Siddiq_al_Minshawi.json",
         photo: "./assets/images/Mohamed-Siddiq-El-Minshawi.jpeg",
         bio: "Mohamed Siddiq al-Minshawi, un maître égyptien du tajwid, est connu pour sa récitation profonde et spirituelle. Il est considéré comme l'un des plus grands récitateurs de tous les temps, ayant influencé des générations de musulmans.",
         audio: "https://server.com/audio/"
     },
     {
         name: "Abdur-Rahman as-Sudais",
+        filename: "Abdur_Rahman_as_Sudais.json",
         photo: "./assets/images/Abdur-Rahman_As-Sudais.jpg",
         bio: "Abdur-Rahman As-Sudais a mémorisé le Coran à l’âge de 12 ans. Il est devenu imam de la Mosquée sacrée de La Mecque à seulement 22 ans. En 2005, il a été nommé 'Personnalité islamique de l’année'. Il a dirigé les prières du tarawih avec des millions de fidèles derrière lui, un record historique en nombre de participants à une prière collective.",
         audio: "https://server.com/audio/"
@@ -1327,6 +1341,20 @@ function loadJSON(url) {
         .catch(error => {
             console.error('Erreur lors du chargement du fichier JSON:', error);
             throw error;  // Relance l'erreur pour la gestion en amont
+        });
+}
+
+function loadSheikhData(sheikh) {
+    return fetch(`./js/sheikhs/${sheikh.filename}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Fichier non trouvé: ${sheikh.filename}`);
+            }
+            return response.json();
+        })
+        .catch(error => {
+            console.error(`Erreur chargement ${sheikh.filename}:`, error);
+            throw error;
         });
 }
 
