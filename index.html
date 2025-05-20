@@ -11,10 +11,20 @@
     />
 </head>
 <body>
+    <button class="circular-btn" id="quran-button">
+        <img src="./assets/images/quran.png" alt="Quran Icon">
+    </button>
+
+    <div id="sourate-container" class="sourate-container">
+            <!-- Le texte de la sourate sera inséré ici dynamiquement -->
+        </div>
+    </div>
+    
+    <div id="welcome-message" class="welcome-message">
+        Salam Aleykoum
+    </div> 
+
     <div class="welcome-screen">
-        <h1>Salam Aleykoum!</h1>
-        <p>Select your Sheikh to start:</p>
-        
         <section class="carousel">
             <ul class="carousel__list" id="sheikh-carousel">
                 <!-- Les sheikhs seront insérés ici dynamiquement -->
@@ -29,7 +39,7 @@
             <!-- Liste des Sheikhs ici -->
         </div>
 
-        <div class="menuL" id="menuL">
+        <div class="menuL">
             <div class="hidden md:inline code-style">
                 <em class="blue">function</em> 
                 <span class="green">quranFor</span>(<em class="orange">task</em> = 
@@ -40,9 +50,43 @@
                 <span class="purple">to focus the soul and inspire the heart.`</span>; 
                 }
             </div>
+            <div class="audio-controls">
+                <div class="sourate-marquee-container">
+                    <div class="sourate-marquee" id="current-sourate">
+                        <!-- Le contenu sera généré par JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="control-row">
+                    <button class="control-btn" id="prev-sourate">[prev]</button>
+                    <button class="control-btn" id="backward-30">[-30]</button>
+                    <button class="control-btn" id="play-pause">[play]</button>
+                    <button class="control-btn" id="forward-30">[+30]</button>
+                    <button class="control-btn" id="next-sourate">[next]</button>
+                </div>
+                
+                <div class="control-row">
+                    <span id="current-time">--:--:--</span>
+                    <button class="control-btn" id="volume-down">[v-]</button>
+                    <span id="volume-level" class="volume-display">100%</span>
+                    <button class="control-btn" id="volume-up">[v+]</button>
+                    <button class="control-btn" id="loop-mode">[loop]</button>
+                </div>
+
+                <div class="sheikh-stats">
+                    <div class="stat-item"><span id="total-sourates">// 114</span>sourates</div>
+                    <div class="stat-item"><span id="total-juzz">// 30</span>juzz</div>
+                    <div class="stat-item"><span id="total-hizb">// 60</span>hizb</div>
+                    <div class="stat-item"><span id="heures">--</span>heures</div>
+                    <div class="stat-item"><span id="minutes">--</span>minutes</div>
+                    <div class="stat-item"><span id="secondes">--</span>secondes</div>
+                </div>
+
+            </div>
+
         </div>
     </div>
-
     <script src="./js/script.js"></script>
+    <script src="./js/responsiveStyles.js"></script>
 </body>
 </html>

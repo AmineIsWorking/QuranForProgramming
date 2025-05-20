@@ -56,9 +56,16 @@
     font-style: normal;
 }
 
+@font-face {
+  font-family: 'Quran';
+  src: url('../assets/fonts/Quran/Amiri-1.001/AmiriQuran.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
 
 body {
-    background-color: #222;
+    background-color: #1a1a1a;
     color: #e1e1e1;
     font-family: 'IBM', monospace;
     margin: 0;
@@ -68,16 +75,70 @@ body {
     height: 100vh;
 }
 
+.welcome-message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  padding: 20px;
+  font-size: 24px;
+  font-family: 'IBM', monospace;
+  z-index: 9999;
+  opacity: 1;
+  transition: top 2s ease-in-out, opacity 2s ease-in-out;
+}
+
+.welcome-message.up {
+  top: 7%;
+  opacity: 1;
+}
+
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(50px); /* Départ depuis le bas */
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0); /* Position finale */
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 1s ease-out forwards; /* Animation sur 1 seconde */
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.fade-out {
+  animation: fadeOut 0.5s ease-out forwards;
+}
+
+
+
 .welcome-screen {
+    opacity: 0;
+    transition: opacity 2s ease-in;
+    font-family: 'IBM', monospace;
     position: absolute;
     top: 0;
     text-align: center;
     font-size: 24px;
-    color: #1beb9e;
+    color: #ffffff;
 }
 
-#welcome-screen h1 {
-    font-size: 36px;
+
+.welcome-screen.fade-in {
+    opacity: 1;
 }
 
 
@@ -124,12 +185,10 @@ body {
     width: 300px;
     padding: 60px 20px 20px 20px;
     box-sizing: border-box;
-    overflow-y: auto;
 }
 
 .menuL {
-    overflow-y: auto;
-    max-height: 300px;
+    max-height: 700px;
     padding: 10px;
     position: absolute;
     left: 0;
@@ -140,6 +199,122 @@ body {
     font-size: 16px;
     word-break: break-all;
     overflow-wrap: break-word;
+}
+
+.audio-controls {
+  position: absolute;
+  top: 350px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+}
+
+.control-btn {
+  background: none;
+  border: none;
+  font-weight: bold;
+  color: #1beb9e;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  display: inline;
+}
+
+.control-btn.active, .action.play.active {
+  color: rgba(0, 0, 0, 0.899);
+  background-color: #1beb9e;
+}
+
+.control-btn:hover {
+  color: rgba(0, 0, 0, 0.899);
+  background-color: #1beb9e;
+}
+
+#current-sourate {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+#current-time {
+  font-family: monospace;
+  color: #898989;
+  padding: 0 0 0 8px;
+}
+
+#volume-level {
+  font-family: monospace;
+  color: #898989;
+}
+
+.volume-display {
+  display: inline-block;
+  width: 40px; /* Largeur suffisante pour 3 chiffres */
+  text-align: center;
+  font-family: monospace; /* Pour une police à largeur fixe */
+}
+
+#volume-down, #volume-up, #random-mode {
+  font-family: monospace;
+  color: #b462ff;
+}
+
+#volume-down:hover, #volume-up:hover, #random-mode:hover {
+  background-color: #b462ff;
+  color: #000000c1;
+}
+
+.sourate-marquee-container {
+  width: 310px;
+  overflow: hidden;
+  white-space: nowrap;
+  position: absolute;
+  top: -25px;
+  left : 9px;
+}
+
+.sourate-marquee {
+  display: inline-block;
+  position: relative;
+  animation: marquee-step 20s steps(20) infinite;
+  font-weight: bold;
+  color: #898989;
+}
+
+@keyframes marquee-step {
+  0% {
+      transform: translateX(0);
+  }
+  100% {
+      transform: translateX(-50%); /* Défile jusqu'à la moitié du contenu */
+  }
+}
+
+.sheikh-stats {
+  display: flex;
+  flex-direction: column;  /* Affichage vertical */
+  margin: 20px 0;
+  font-family: monospace;
+  font-size: 16px;
+  color: #333;
+  position: absolute;
+  top: 70px;
+}
+
+.stat-item {
+  padding: 4px 0;         /* Réduit le padding vertical */
+  display: flex;
+  align-items: baseline;
+  color: #898989;
+}
+
+.stat-item span {
+  font-weight: bold;
+  color: #898989;
+  min-width: 70px;
+  display: inline-block;
 }
 
 .menu-item {
@@ -167,23 +342,53 @@ body {
     opacity: 0.8;
 }
 
+.circular-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: none;
+  background-color: #2c3e50;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+}
+
+.circular-btn img {
+  width: 60%;
+  height: 60%;
+  object-fit: contain;
+  filter: invert(100%); /* Rend l'icône blanche, utile si elle est noire */
+  transition: transform 0.2s;
+}
+
+.circular-btn:hover {
+  background-color: #34495e;
+  transform: scale(1.1);
+}
+
+.circular-btn:active {
+  transform: scale(0.95);
+}
+
 
 audio {
     margin-top: 40px;
 }
 
 .hidden {
-display: none;
+  display: none;
 }
 
 .md\:inline {
 display: inline;
-}
-
-@media (min-width: 768px) {
-.md\:inline {
-    display: inline;
-}
 }
 
 .sheikh-info {
@@ -203,6 +408,8 @@ display: inline;
     word-break: normal; 
     max-height: 100vh;    
     overflow-y: auto; 
+    transition: opacity 0.3s ease;
+    opacity: 1;
 }
 
 .sheikh-header {
@@ -229,6 +436,7 @@ display: inline;
     height: 160px;
     object-fit: cover;
     flex-shrink: 0;
+    border-radius: 16px;
 }
 
 
@@ -246,7 +454,7 @@ display: inline;
 .media-info {
   font-family: 'IBM', monospace;
   position: absolute;
-  top: 350px;
+  top: 330px;
   left: 20px;
   width: 100px; 
   font-size: 14px;
@@ -267,10 +475,10 @@ display: inline;
     color: #000000c1;
 }
 
-.media-info .action.play .details {
+.media-info .details {
     position: absolute;
     width: 100px;
-    left: 65px;
+    left: 55px;
     color: #555; 
     font-style: italic;
 }
@@ -278,16 +486,18 @@ display: inline;
 .media-info .action.source .details {
     position: absolute;
     width: 100px;
-    left: 75px;
+    font-weight: bold;
+    left: 85px;
     color: #555; 
     font-style: italic;
     
   }
 
 .action.source {
-    top: 25px;
+    top: 20px;
     position: absolute;
     color: #b462ff;
+    font-weight: bold;
     cursor: pointer;
 }
 
@@ -295,6 +505,20 @@ display: inline;
     background-color: #b462ff;
     color: #000000c1;
 }
+
+.fav {
+  position: absolute;
+  top: 40px;
+  font-weight: bold;
+  color: #f7c948;
+  cursor: pointer;
+}
+
+.media-info .fav:hover {
+  background-color: #f7c948;
+  color: #000000c1;
+}
+
 
 .souratesContainer {
     position: absolute;
@@ -339,6 +563,7 @@ display: inline;
     margin-top: 2px;
 }
 
+
 /* Styles du carrousel - Version fixe */
 :root {
     --canvas: 220;
@@ -355,7 +580,7 @@ display: inline;
     display: grid;
     transform: translate3d(0, 0, 0.1px);
     width: 100%;
-    margin-top: 2rem;
+    margin-top: 4rem;
     overflow: hidden;
   }
   
@@ -387,7 +612,7 @@ display: inline;
                 rgba(255, 255, 255, 0.05) 0px 0px 0px 1px inset;
     transition: all 0.5s cubic-bezier(0.55, 0.24, 0.18, 1);
   }
-
+  
   .carousel__item,
   .carousel__item * {
     transition: all 0.6s cubic-bezier(0.55, 0.24, 0.18, 1);
@@ -408,59 +633,6 @@ display: inline;
   .carousel__item[data-active] {
     flex-basis: var(--width);
     flex-grow: 0;
-  }
-
-  @media screen and (max-width: 800px) {
-    .carousel__item {
-      flex-basis: 15%;
-    }
-  }
-  
-  @media screen and (max-width: 600px) {
-    .carousel__item {
-      flex-basis: 10%;
-      margin: 0 5px;
-      border-radius: 8px;
-      font-size: 3vw;
-    }
-  
-    .carousel__item[data-active] {
-      flex-basis: 45%;
-      flex-grow: 0;
-    }
-  
-    .carousel__item:nth-child(3),
-    .carousel__item:nth-child(7) {
-      flex: 0 0 10px;
-    }
-  
-    .carousel__item:nth-child(2),
-    .carousel__item:nth-child(8) {
-      flex: 0 0 5px;
-      transform: translateX(-50px);
-    }
-  
-    .carousel__item:nth-child(8) {
-      transform: translateX(50px);
-    }
-  
-    .carousel__item:nth-child(1),
-    .carousel__item:nth-child(n + 9) {
-      flex: 0 0 0px;
-      margin: 0;
-      box-shadow: none;
-      opacity: 0 !important;
-    }
-  
-    .carousel__item:not(:nth-child(n + 5)) img,
-    .carousel__item:nth-child(n + 7) img {
-      opacity: 0.8;
-    }
-  
-    .carousel__item:not(:nth-child(n + 4)) *,
-    .carousel__item:nth-child(n + 7) * {
-      opacity: 0 !important;
-    }
   }
   
   .carousel__item img {
@@ -503,6 +675,7 @@ display: inline;
   .carousel__item[data-active] * {
     opacity: 1;
     filter: none;
+    width: 100%;
   }
   
   .carousel__contents {
@@ -548,36 +721,6 @@ display: inline;
     max-width: 18em;
   }
 
-  @media screen and (max-width: 800px) {
-    .carousel__item img {
-      width: calc(var(--width) * 0.7);
-    }
-    .carousel__contents {
-      transform: translateX(-100%) rotate(90deg);
-      transform-origin: bottom right;
-      align-items: end;
-      justify-content: end;
-      background-image: radial-gradient(
-        ellipse at 100% 100%,
-        rgba(0, 0, 0, 0.4) 0%,
-        transparent 50%
-      );
-      background-position: -100% 100%;
-      flex-direction: column;
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      text-align: right;
-    }
-    [data-active] .carousel__contents {
-      background-position: 100% 100%;
-    }
-    .carousel__contents .sheikh__name {
-      max-width: 70vh;
-      transform: translateX(200px);
-    }
-  }
-
   [data-active] .carousel__contents * {
     transform: translateX(0px);
     transition-duration: 0.66s;
@@ -599,32 +742,144 @@ display: inline;
   .carousel__item[data-active] .carousel__contents {
     opacity: 1; /* Contenu visible quand actif */
   }
+
+  .carousel__item.exit-left {
+    animation: slideOutLeft 1s forwards;
+  }
   
-  /* Responsive */
-  @media screen and (max-width: 900px) {
-    :root {
-      --width-normal: 80px;
-      --width-active: 350px;
-    }
-    
-    .carousel__list {
-      gap: 10px;
+  .carousel__item.exit-right {
+    animation: slideOutRight 1s forwards;
+  }
+  
+  @keyframes slideOutLeft {
+    to {
+      transform: translateX(-200%);
+      opacity: 0;
     }
   }
   
-  @media screen and (max-width: 600px) {
-    :root {
-      --width-normal: 60px;
-      --width-active: 280px;
-      --height: calc(60vh - 50px);
+  @keyframes slideOutRight {
+    to {
+      transform: translateX(200%);
+      opacity: 0;
     }
-    
-    .carousel__contents .sheikh__name {
-      font-size: 1.3em;
-    }
-    
   }
 
+  .surah-text-container {
+    margin: 100px auto 0 auto;
+    width: 730px;
+    height: auto;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    top: -60px;
+    padding: 20px 0px 20px 0px;
+    flex-direction: column;
+    word-break: normal;   
+    font-family: 'Quran';
+    text-align: right;
+    direction: rtl;
+    position: relative;
+    right: -50px; /* Déplace l'élément vers la droite */
+}
 
+.verse {
+    margin-bottom: 1.5rem;
+    line-height: 2.5rem;
+    font-size: 1.8rem;
+}
 
-  
+.verse-number {
+    color: #4CAF50;
+    font-weight: bold;
+    margin-left: 0.5rem;
+    font-family: 'QuranFont';
+}
+
+.sheikh-info, .sourate-container {
+  transition: opacity 0.3s ease;
+  pointer-events: auto; /* Par défaut */
+}
+
+.sheikh-info[style*="opacity: 0"], 
+.sourate-container[style*="opacity: 0"] {
+  pointer-events: none !important;
+}
+
+.verse-text {
+  transition: background-color 0.2s ease;
+}
+
+/* Pour tout le document */
+body, * {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* Internet Explorer 10+ */
+}
+
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none;               /* Chrome, Safari, Opera */
+}
+
+.current-segment {
+    background-color: rgba(200, 200, 200, 0.5);
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+.current-verse {
+    background-color: rgba(200, 200, 200, 0.3);
+}
+
+.highlight {
+    color: #dddd25;
+}
+
+.highlight.active {
+    background-color: #dddd25;
+    color: rgba(0, 0, 0, 0.899);
+}
+
+.highlight:hover {
+    background-color: #dddd25;
+    color: rgba(0, 0, 0, 0.899);
+}
+
+#ack-cookies {
+  background: none;
+  border: none;
+  font-weight: bold;
+  color: #dddd25;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  display: inline;
+}
+
+#ack-cookies:hover {
+  background-color: #dddd25;
+  color: rgba(0, 0, 0, 0.899);
+}
+
+#cookie-alert {
+    position: absolute;
+    top: 650px;
+    z-index: 1000;
+}
+
+.learning {
+  position: absolute;
+  top: 60px;
+  font-weight: bold;
+  color: #ff45b4;
+  cursor: pointer;
+}
+
+.learning:hover {
+  background-color: #ff45b4;
+  color: #000000c1;
+}
+
+.learning.active {
+  color: rgba(0, 0, 0, 0.899);
+  background-color: #ff45b4;
+}
