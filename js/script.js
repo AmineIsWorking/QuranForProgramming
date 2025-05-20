@@ -66,7 +66,7 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
         currentHighlightInterval = null;
     }
 
-    loadJSON('./js/quran-com_timestamps.json')
+    loadJSON('https://github.com/amineisworking/QuranForProgramming/releases/download/v1.0.0/quran-com_timestamps.json')
         .then(datta => {
             if (datta[sheikh.name]) {
                 if (currentAudio) {

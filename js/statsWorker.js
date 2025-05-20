@@ -3,7 +3,7 @@ self.onmessage = async function(e) {
     const { sheikhName } = e.data;
     
     try {
-        const response = await fetch('./quran-com_timestamps.json');
+        const response = await fetch('https://github.com/amineisworking/QuranForProgramming/releases/download/v1.0.0/quran-com_timestamps.json');
         const data = await response.json();
         const sheikhData = data[sheikhName];
         
