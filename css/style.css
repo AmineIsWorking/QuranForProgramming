@@ -862,7 +862,7 @@ body::-webkit-scrollbar,
 
 #cookie-alert {
     position: absolute;
-    top: 650px;
+    top: 600px;
     z-index: 1000;
 }
 
