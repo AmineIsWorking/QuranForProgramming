@@ -422,13 +422,15 @@ function createOverlay(data) {
     
     const playSpan = document.createElement('span');
     playSpan.className = 'action play';
-    playSpan.textContent = '[all]';
-    playSpan.onclick = () => {
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = '[all]';
+    label.onclick = () => {
         isPlayAll = !isPlayAll;
         if (isPlayAll) {
-            playSpan.classList.add('active');
+            label.classList.add('active');
         } else {
-            playSpan.classList.remove('active');
+            label.classList.remove('active');
         }
     };
     
@@ -436,18 +438,20 @@ function createOverlay(data) {
     detailsDuration.className = 'details';
     detailsDuration.textContent = '...';
 
+    playSpan.appendChild(label);
     playSpan.appendChild(detailsDuration);
     mediaInfo.appendChild(playSpan);
 
     const sourceSpan = document.createElement('span');
     sourceSpan.className = 'action source';
-    sourceSpan.textContent = '[source]';
-    sourceSpan.onclick = () => {};
-    
+    const labelsource = document.createElement('span');
+    labelsource.className = 'label';
+    labelsource.textContent = '[source]';
 
     const detailsSize = document.createElement('span');
     detailsSize.className = 'details';
     detailsSize.textContent = '...';
+    sourceSpan.appendChild(labelsource);
     sourceSpan.appendChild(detailsSize);
 
     mediaInfo.appendChild(sourceSpan);

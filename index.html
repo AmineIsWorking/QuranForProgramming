@@ -14,11 +14,6 @@
     <button class="circular-btn" id="quran-button">
         <img src="./assets/images/quran.png" alt="Quran Icon">
     </button>
-
-    <div id="sourate-container" class="sourate-container">
-            <!-- Le texte de la sourate sera inséré ici dynamiquement -->
-        </div>
-    </div>
     
     <div id="welcome-message" class="welcome-message">
         Salam Aleykoum
@@ -35,6 +30,11 @@
     
     <div id="main-screen" style="display:none;">
         <!-- Contenu principal ici -->
+         
+        <div id="sourate-container" class="sourate-container">
+            <!-- Le texte de la sourate sera inséré ici dynamiquement -->
+        </div>
+
         <div class="menuR" id="menuR">
             <!-- Liste des Sheikhs ici -->
         </div>
@@ -58,19 +58,19 @@
                 </div>
                 
                 <div class="control-row">
-                    <button class="control-btn" id="prev-sourate">[prev]</button>
-                    <button class="control-btn" id="backward-30">[-30]</button>
-                    <button class="control-btn" id="play-pause">[play]</button>
-                    <button class="control-btn" id="forward-30">[+30]</button>
-                    <button class="control-btn" id="next-sourate">[next]</button>
+                    <span class="control-btn" id="prev-sourate"><span class="label">[prev]</span></span>
+                    <span class="control-btn" id="backward-30"><span class="label">[-30]</span></span>
+                    <span class="control-btn" id="play-pause"><span class="label">[play]</span></span>
+                    <span class="control-btn" id="forward-30"><span class="label">[+30]</span></span>
+                    <span class="control-btn" id="next-sourate"><span class="label">[next]</span></span>
                 </div>
                 
                 <div class="control-row">
-                    <span id="current-time">--:--:--</span>
-                    <button class="control-btn" id="volume-down">[v-]</button>
-                    <span id="volume-level" class="volume-display">100%</span>
-                    <button class="control-btn" id="volume-up">[v+]</button>
-                    <button class="control-btn" id="loop-mode">[loop]</button>
+                    <span id="current-time"><span class="label">--:--:--</span></span>
+                    <span class="control-btn" id="volume-down"><span class="label">[v-]</span></span>
+                    <span id="volume-level" class="volume-display"><span class="label">100%</span></span>
+                    <span class="control-btn" id="volume-up"><span class="label">[v+]</span></span>
+                    <span class="control-btn" id="loop-mode"><span class="label">[loop]</span></span>
                 </div>
 
                 <div class="sheikh-stats">

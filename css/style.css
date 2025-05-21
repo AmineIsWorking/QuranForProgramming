@@ -73,6 +73,10 @@ body {
     justify-content: center;
     align-items: center;
     height: 100vh;
+    position: relative;
+    padding-left: 350px; /* Largeur de menuL */
+    padding-right: 300px; /* Largeur de menuR */
+    overflow-x: hidden; /* Empêche le débordement horizontal */
 }
 
 .welcome-message {
@@ -178,8 +182,23 @@ body {
     color: #dddd25;
 }
 
+.main-screen {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  width: 100%;
+}
+
+.sourate-container {
+  padding-left: 120px;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: left;
+  width: 100%;
+}
+
 .menuR {
-    position: absolute;
+    position: fixed;
     top: 0px;
     right: 0px;
     width: 300px;
@@ -188,46 +207,51 @@ body {
 }
 
 .menuL {
-    max-height: 700px;
-    padding: 10px;
-    position: absolute;
-    left: 0;
-    top: 40px;
-    height: 100%;
-    width: 350px;
-    margin-left: 35px;
-    font-size: 16px;
-    word-break: break-all;
-    overflow-wrap: break-word;
+  position: fixed;
+  left: 0;
+  top: 40px;
+  height: 100%;
+  width: 350px;
+  margin-left: 35px;
+  padding: 10px;
+  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  max-height: 700px;
 }
 
 .audio-controls {
-  position: absolute;
-  top: 350px;
+  display: flex;
+  flex-direction: column;
 }
 
 .control-row {
   display: flex;
   align-items: center;
+  justify-content: space-between; /* ou space-evenly / start / end selon besoin */
+  width: 100%;
+  margin-bottom: 12px;
 }
 
-.control-btn {
-  background: none;
+.control-btn {        
   border: none;
+  background: none;
   font-weight: bold;
   color: #1beb9e;
   cursor: pointer;
   font-family: inherit;
   font-size: inherit;
-  display: inline;
+  flex: 1;
+  text-align: center;
 }
 
-.control-btn.active, .action.play.active {
+
+.control-btn > .label.active, .action.play > .label.active {
   color: rgba(0, 0, 0, 0.899);
   background-color: #1beb9e;
 }
 
-.control-btn:hover {
+.control-btn > .label:hover {
   color: rgba(0, 0, 0, 0.899);
   background-color: #1beb9e;
 }
@@ -235,7 +259,6 @@ body {
 #current-sourate {
   font-weight: bold;
   text-align: center;
-  margin-bottom: 10px;
 }
 
 #current-time {
@@ -244,7 +267,7 @@ body {
   padding: 0 0 0 8px;
 }
 
-#volume-level {
+#volume-level > .label {
   font-family: monospace;
   color: #898989;
 }
@@ -256,23 +279,20 @@ body {
   font-family: monospace; /* Pour une police à largeur fixe */
 }
 
-#volume-down, #volume-up, #random-mode {
+#volume-down > .label, #volume-up > .label, #random-mode > .label {
   font-family: monospace;
   color: #b462ff;
 }
 
-#volume-down:hover, #volume-up:hover, #random-mode:hover {
+#volume-down > .label:hover, #volume-up > .label:hover, #random-mode > .label:hover {
   background-color: #b462ff;
   color: #000000c1;
 }
 
 .sourate-marquee-container {
-  width: 310px;
+  width: 100%;
   overflow: hidden;
   white-space: nowrap;
-  position: absolute;
-  top: -25px;
-  left : 9px;
 }
 
 .sourate-marquee {
@@ -294,13 +314,12 @@ body {
 
 .sheikh-stats {
   display: flex;
-  flex-direction: column;  /* Affichage vertical */
-  margin: 20px 0;
+  flex-direction: column;
   font-family: monospace;
   font-size: 16px;
   color: #333;
-  position: absolute;
-  top: 70px;
+  margin: 20px 0;
+  margin-top: 10px;
 }
 
 .stat-item {
@@ -318,7 +337,6 @@ body {
 }
 
 .menu-item {
-    top: 60px;
     cursor: pointer;
     color: #1beb9e;
     font-style: italic;
@@ -388,13 +406,16 @@ audio {
 }
 
 .md\:inline {
-display: inline;
+  display: inline;
+  word-break: break-all;
+  margin-bottom: 150px;
 }
 
 .sheikh-info {
     position: fixed;
+    left: 390px;
     right: 300px;
-    width: 740px; 
+    width: auto; 
     height: 100vh;
     padding: 20px;
     background-color: rgba(255, 255, 255, 0);
@@ -413,13 +434,13 @@ display: inline;
 }
 
 .sheikh-header {
-    position: absolute;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 40px;
     right: 10px; 
     left: 20px;
+    margin-bottom: 20px;
 }
 
 
@@ -441,74 +462,70 @@ display: inline;
 
 
 .sheikh-bio {
-    position: absolute;
-    top: 200px;
     white-space: normal;
     overflow-wrap: break-word;
     word-break: break-word;
     font-size: 1.11111111vw;
     color: #e1e1e1;
     line-height: 1.5;
+    margin-bottom: 40px;
 }
 
 .media-info {
   font-family: 'IBM', monospace;
-  position: absolute;
-  top: 330px;
-  left: 20px;
-  width: 100px; 
+  width: fit-content; 
   font-size: 14px;
   font-weight: 400;
   color: #333;
   line-height: 1.5;
+  display: inline-flex;
+  flex-direction: column;
+  margin-bottom: 40px;
 }
 
-.action.play {
-  position: absolute;
+.action.play,
+.action.source {
+  display: flex; 
+  gap: 12px;
+}
+
+
+.action.play > .label {
+  display: inline;
+  width: fit-content;
   font-weight: bold;
   color: #1beb9e;
   cursor: pointer;
 }
 
-.media-info .action:hover {
-    background-color: #1beb9e;
-    color: #000000c1;
+.action.play > .label:hover {
+  background-color: #1beb9e;
+  color: #000000c1;
 }
 
-.media-info .details {
-    position: absolute;
+.details {
     width: 100px;
-    left: 55px;
     color: #555; 
-    font-style: italic;
-}
-
-.media-info .action.source .details {
-    position: absolute;
-    width: 100px;
     font-weight: bold;
-    left: 85px;
-    color: #555; 
     font-style: italic;
-    
-  }
+}
 
-.action.source {
-    top: 20px;
-    position: absolute;
+.action.source > .label {
+    display: inline;
+    width: fit-content;
     color: #b462ff;
     font-weight: bold;
     cursor: pointer;
 }
 
-.action.source:hover {
+.action.source > .label:hover {
     background-color: #b462ff;
     color: #000000c1;
 }
 
 .fav {
-  position: absolute;
-  top: 40px;
+  display: inline;
+  width: fit-content;
   font-weight: bold;
   color: #f7c948;
   cursor: pointer;
@@ -519,12 +536,24 @@ display: inline;
   color: #000000c1;
 }
 
-
-.souratesContainer {
-    position: absolute;
-    top: 415px;
-    padding: 0;
+.learning {
+  display: inline;
+  width: fit-content;
+  font-weight: bold;
+  color: #ff45b4;
+  cursor: pointer;
 }
+
+.learning:hover {
+  background-color: #ff45b4;
+  color: #000000c1;
+}
+
+.learning.active {
+  color: rgba(0, 0, 0, 0.899);
+  background-color: #ff45b4;
+}
+
 
 .sourate-list {
     padding: 0%;
@@ -765,22 +794,19 @@ display: inline;
     }
   }
 
-  .surah-text-container {
-    margin: 100px auto 0 auto;
-    width: 730px;
-    height: auto;
-    max-height: calc(100vh - 120px);
-    overflow-y: auto;
-    top: -60px;
-    padding: 20px 0px 20px 0px;
-    flex-direction: column;
-    word-break: normal;   
-    font-family: 'Quran';
-    text-align: right;
-    direction: rtl;
-    position: relative;
-    right: -50px; /* Déplace l'élément vers la droite */
+.surah-text-container {
+  width: 100%;
+  max-width: 730px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding: 20px 0;
+  font-family: 'Quran';
+  text-align: right;
+  direction: rtl;
+  position: relative;
 }
+
+
 
 .verse {
     margin-bottom: 1.5rem;
@@ -861,25 +887,5 @@ body::-webkit-scrollbar,
 }
 
 #cookie-alert {
-    position: absolute;
-    top: 600px;
     z-index: 1000;
-}
-
-.learning {
-  position: absolute;
-  top: 60px;
-  font-weight: bold;
-  color: #ff45b4;
-  cursor: pointer;
-}
-
-.learning:hover {
-  background-color: #ff45b4;
-  color: #000000c1;
-}
-
-.learning.active {
-  color: rgba(0, 0, 0, 0.899);
-  background-color: #ff45b4;
 }
