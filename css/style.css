@@ -888,7 +888,7 @@ body::-webkit-scrollbar,
     z-index: 1000;
 }
 
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 1290px) {
 
   html, body {
     width: 100vw;          
