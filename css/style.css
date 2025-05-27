@@ -133,8 +133,6 @@ body {
     opacity: 0;
     transition: opacity 2s ease-in;
     font-family: 'IBM', monospace;
-    position: absolute;
-    top: 0;
     text-align: center;
     font-size: 24px;
     color: #ffffff;
@@ -212,7 +210,7 @@ body {
   top: 40px;
   height: 100%;
   width: 350px;
-  margin-left: 35px;
+  margin-left: 30px;
   padding: 10px;
   font-size: 16px;
   display: flex;
@@ -227,11 +225,14 @@ body {
 
 .control-row {
   display: flex;
+  flex-wrap: wrap; /* ← C'est ça qui permet le retour à la ligne */
   align-items: center;
-  justify-content: space-between; /* ou space-evenly / start / end selon besoin */
   width: 100%;
   margin-bottom: 12px;
+  gap: 8px;
+  row-gap: 4px; 
 }
+
 
 .control-btn {        
   border: none;
@@ -251,6 +252,11 @@ body {
   background-color: #1beb9e;
 }
 
+#loop-mode > .label.active {
+  color: rgba(0, 0, 0, 0.899);
+  background-color: #b462ff;
+}
+
 .control-btn > .label:hover {
   color: rgba(0, 0, 0, 0.899);
   background-color: #1beb9e;
@@ -264,7 +270,6 @@ body {
 #current-time {
   font-family: monospace;
   color: #898989;
-  padding: 0 0 0 8px;
 }
 
 #volume-level > .label {
@@ -279,12 +284,12 @@ body {
   font-family: monospace; /* Pour une police à largeur fixe */
 }
 
-#volume-down > .label, #volume-up > .label, #random-mode > .label {
+#volume-down > .label, #volume-up > .label, #loop-mode > .label {
   font-family: monospace;
   color: #b462ff;
 }
 
-#volume-down > .label:hover, #volume-up > .label:hover, #random-mode > .label:hover {
+#volume-down > .label:hover, #volume-up > .label:hover, #loop-mode > .label:hover {
   background-color: #b462ff;
   color: #000000c1;
 }
@@ -373,10 +378,9 @@ body {
   cursor: pointer;
   transition: background-color 0.3s, transform 0.2s;
   z-index: 1000;
-  display: flex;
   justify-content: center;
   align-items: center;
-  opacity: 0;
+  display: none;
 }
 
 .circular-btn img {
@@ -405,8 +409,7 @@ audio {
   display: none;
 }
 
-.md\:inline {
-  display: inline;
+.code-style {
   word-break: break-all;
   margin-bottom: 150px;
 }
@@ -447,7 +450,6 @@ audio {
 .sheikh-name {
     font-size: 4vw;
     line-height: 1.11111111em;
-    font-weight: 200;
     color: #e1e1e1;
     margin: 0;
 }
@@ -465,7 +467,6 @@ audio {
     white-space: normal;
     overflow-wrap: break-word;
     word-break: break-word;
-    font-size: 1.11111111vw;
     color: #e1e1e1;
     line-height: 1.5;
     margin-bottom: 40px;
@@ -500,7 +501,7 @@ audio {
 
 .action.play > .label:hover {
   background-color: #1beb9e;
-  color: #000000c1;
+  color: inherit;
 }
 
 .details {
@@ -722,9 +723,6 @@ audio {
     );
     background-size: 170% 200px;
     background-repeat: no-repeat;
-    position: absolute;
-    top: 0;
-    left: 0;
   }
 
   .carousel__contents .sheikh__name {
@@ -745,7 +743,7 @@ audio {
   .carousel__contents .sheikh__name {
     margin: 0;
     line-height: 1.1;
-    transform: translateX(-200px);
+    transform: translateX(-300px);
     transition-duration: 1s;
     max-width: 18em;
   }
@@ -888,4 +886,259 @@ body::-webkit-scrollbar,
 
 #cookie-alert {
     z-index: 1000;
+}
+
+@media screen and (max-width: 768px) {
+
+  html, body {
+    width: 100vw;          
+    overflow: hidden;    
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    height: auto;
+    min-height: 100vh;
+    display: block;
+  }
+
+  .welcome-message.up {
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+
+  #welcome-message {
+    white-space: normal;
+    overflow-x: auto;
+    text-overflow: ellipsis;
+    width: 80%;
+    font-size: 20px;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  .carousel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    -webkit-overflow-scrolling: touch; /* Scroll fluide iOS */
+  }
+
+  .carousel__list {
+    flex-wrap: nowrap;
+    justify-content: center;
+    padding: 2em 10em 3em;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+
+  .carousel__item {
+    width: 80vw;             
+    min-width: 55vw;
+    height: 95vw;           
+    max-height: 100vw;
+    flex: 0 0 auto;
+    scroll-snap-align: center;
+  }
+
+  .carousel__item[data-active] {
+    width: 80vw;
+  }
+
+  .carousel__contents {
+    padding: 15px;
+  }
+
+  .carousel__contents .sheikh__name {
+    font-size: 0.9rem;
+    max-width: 100%;
+  }
+
+  #main-screen {
+        display: none !important;
+  }
+
+  #main-screen-phone {
+    top:0px;
+    padding: 15px;
+  }
+  
+  .code-style {
+    margin-bottom: clamp(20px, 3vw, 30px);
+  }
+
+  .sheikh-header {
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: clamp(5px, 2vw, 20px);
+  }
+
+  .sheikh-name {
+    text-align: center;
+    width: 100%;
+    font-size: clamp(18px, 5vw, 28px); 
+    margin-bottom: clamp(20px, 3vw, 30px);
+  }
+
+  .sheikh-photo {
+    display: block;
+    margin: 0 auto;
+    margin-bottom: clamp(10px, 3vw, 30px);
+    width: 250px; 
+    height: 330px; 
+  }
+
+  .sheikh-bio {
+    text-align: justify;
+  }
+
+  /* Appliquez ce style aux labels des boutons de contrôle */
+  .control-btn > .label {
+    min-width: 800px; /* Largeur minimale garantie */
+  }
+
+  #volume-level-mobile > .label {
+  font-family: monospace;
+  color: #898989;
+}
+
+  #volume-down-mobile > .label, #volume-up-mobile > .label, #loop-mode-mobile > .label {
+    font-family: monospace;
+    color: #b462ff;
+  }
+
+  #volume-down-mobile > .label:hover, #volume-up-mobile > .label:hover {
+    background-color: #b462ff;
+    color: #000000c1;
+  }
+
+  #loop-mode-mobile > .label:hover {
+    background-color: inherit;
+    color: #b462ff;
+  }
+
+  .action.play.mobile > .label.active {
+    color: rgba(0, 0, 0, 0.899);
+    background-color: #1beb9e;
+  }
+
+  #loop-mode-mobile > .label.active {
+    color: rgba(0, 0, 0, 0.899);
+    background-color: #b462ff;
+  }
+
+  #current-time-mobile {
+    font-family: monospace;
+    color: #898989;
+    font-size: larger;
+  }
+
+  .label {
+    font-size: fit-content;
+  }
+
+  #current-sourate-mobile {
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .media-info-mobile {
+    font-family: 'IBM', monospace;
+    width: fit-content; 
+    font-size: 14px;
+    font-weight: 400;
+    color: #333;
+    line-height: 1.5;
+    display: inline-flex;
+    flex-direction: column;
+    margin-bottom: 40px;
+  }
+
+  .action.play,
+  .action.source {
+    display: flex; 
+    gap: 12px;
+  }
+
+
+  .action.play.mobile > .label {
+    display: inline;
+    width: fit-content;
+    font-weight: bold;
+    color: #1beb9e;
+    cursor: pointer;
+  }
+
+  .details.mobile {
+      width: 100px;
+      color: #555; 
+      font-weight: bold;
+      font-style: italic;
+  }
+
+  .action.source.mobile > .label {
+      display: inline;
+      width: fit-content;
+      color: #b462ff;
+      font-weight: bold;
+      cursor: pointer;
+  }
+
+  .action.source.mobile > .label:hover {
+      background-color: #b462ff;
+      color: #000000c1;
+  }
+
+  .fav.mobile {
+    display: inline;
+    width: fit-content;
+    font-weight: bold;
+    color: #f7c948;
+    cursor: pointer;
+  }
+
+  .media-info-mobile .fav.mobile:hover {
+    background-color: #f7c948;
+    color: #000000c1;
+  }
+
+  .learning.mobile {
+    display: inline;
+    width: fit-content;
+    font-weight: bold;
+    color: #ff45b4;
+    cursor: pointer;
+  }
+
+  .learning.mobile:hover {
+    background-color: #ff45b4;
+    color: #000000c1;
+  }
+
+  .learning.mobile.active {
+    color: rgba(0, 0, 0, 0.899);
+    background-color: #ff45b4;
+  }
+
+  .sourate-list {
+    justify-content: center !important;
+    align-items: center !important;
+    padding-left: 0 !important;
+  }
+
+  .sourate-container {
+    padding-left : 12px;
+  }
 }

@@ -2,10 +2,10 @@
 let statsWorker = null;
 let currentAudio = null;
 let currentSourateIndex = -1;
-let isLoopMode = false;
 let currentVolume = 1.0;
 let isPlaying = false;
 let updateInterval;
+let isLoopEnabled = false;
 let currentHighlightInterval = null;
 let currentSourateAudioUrl = null;
 let currentSurahText = null;
@@ -16,24 +16,23 @@ const statsCache = {};
 
 // Fonction pour mettre à jour le nom de la sourate
 function updateSourateName(sourate) {
-    const marquee = document.getElementById('current-sourate');
-    const baseText = `${sourate.number}. ${sourate.name} (${sourate.arabicname})`;
-    
-    // Répète le texte 3 fois séparé par des •
-    const marqueeText = `${baseText} • ${baseText} • ${baseText}`;
-    marquee.textContent = marqueeText;
-    
-    // Ajuste la vitesse en fonction de la longueur
-    const textWidth = marquee.scrollWidth / 3; // Largeur d'une occurrence
-    const duration = Math.max(10, textWidth / 30); // 30px par seconde
-    
-    // Applique l'animation
-    marquee.style.animation = `marquee-step ${duration}s steps(${Math.floor(textWidth/10)}) infinite`;
-    
-    // Redémarre l'animation
-    marquee.style.animation = 'none';
-    void marquee.offsetWidth; // Force le reflow
-    marquee.style.animation = `marquee-step ${duration}s steps(${Math.floor(textWidth/10)}) infinite`;
+    ['current-sourate', 'current-sourate-mobile'].forEach(id => {
+        const marquee = document.getElementById(id);
+        if (!marquee) return;
+
+        const baseText = `${sourate.number}. ${sourate.name} (${sourate.arabicname})`;
+        const marqueeText = `${baseText} • ${baseText} • ${baseText}`;
+        marquee.textContent = marqueeText;
+
+        const textWidth = marquee.scrollWidth / 3;
+        const duration = Math.max(10, textWidth / 30);
+
+        marquee.style.animation = `marquee-step ${duration}s steps(${Math.floor(textWidth/10)}) infinite`;
+
+        marquee.style.animation = 'none';
+        void marquee.offsetWidth;
+        marquee.style.animation = `marquee-step ${duration}s steps(${Math.floor(textWidth/10)}) infinite`;
+    });
 }
 
 // Fonction pour mettre à jour le temps
@@ -44,10 +43,15 @@ function updateCurrentTime() {
         const minutes = Math.floor(currentTimeMs / (1000 * 60)) % 60;
         const hours = Math.floor(currentTimeMs / (1000 * 60 * 60));
         
-        document.getElementById('current-time').textContent = 
-            String(hours).padStart(2, '0') + ':' +
-            String(minutes).padStart(2, '0') + ':' +
-            String(seconds).padStart(2, '0');
+        ['current-time', 'current-time-mobile'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+            el.textContent =
+                String(hours).padStart(2, '0') + ':' +
+                String(minutes).padStart(2, '0') + ':' +
+                String(seconds).padStart(2, '0');
+            }
+        });
     }
 }
 
@@ -81,10 +85,12 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                 
                 currentAudio = new Audio(audioUrl);
                 currentAudio.volume = currentVolume;
+                currentAudio.loop = isLoopEnabled;
                 currentVerseTimings = surahData["audio_files"][0]["verse_timings"];
 
                 // Mise à jour UI
                 updateSourateName(sourate);
+                document.querySelector('.circular-btn').style.display = 'flex';
                 document.querySelector('.circular-btn').style.opacity = '1';
                 document.querySelectorAll('.details')[0].textContent = formatDuration(surahData["audio_files"][0]["duration"]);
                 document.querySelector('.source').onclick = () => window.open(audioUrl);
@@ -95,7 +101,10 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                     // Vérifier qu'on a bien le bon audio (au cas où l'utilisateur change rapidement)
                     if (currentAudio && currentAudio.src === currentSourateAudioUrl) {
                         isPlaying = true;
-                        document.getElementById('play-pause').textContent = '[stop]';
+                        ['play-pause', 'play-pause-mobile'].forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) el.textContent = '[stop]';
+                        });
                         
                         // Démarrer la mise à jour du temps
                         updateInterval = setInterval(updateCurrentTime, 1000);
@@ -112,13 +121,16 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                     clearInterval(updateInterval);
                     clearInterval(currentHighlightInterval);
 
+                    if (isLoopEnabled) {
+                        currentAudio.currentTime = 0;
+                        currentAudio.play();
+                        return;
+                    }
+
                     const container = document.querySelector('.sourate-container');
                     const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
 
-                    if (isLoopMode) {
-                        currentAudio.currentTime = 0;
-                        currentAudio.play().then(onAudioStarted);
-                    } else if (isPlayAll && currentSourateIndex < sourates.length - 1) {
+                    if (isPlayAll && currentSourateIndex < sourates.length - 1) {
                         if (container.style.opacity === '1') {
                             container.style.transition = 'opacity 0.3s ease';
                             container.style.opacity = '0';
@@ -147,7 +159,10 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                     } else {
                         isPlayAll = false;
                         isPlaying = false;
-                        document.getElementById('play-pause').textContent = '[play]';
+                        ['play-pause', 'play-pause-mobile'].forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) el.textContent = '[play]';
+                        });
                     }
                 };
 
@@ -311,11 +326,14 @@ function playPrevSourate() {
 function loadSurahText(index) {
     return new Promise((resolve, reject) => {
         const surahNumber = String(index + 1);
+
+        // Détection automatique : moins de 768px = mobile
+        const isMobile = window.matchMedia('(max-width: 767px)').matches;
         
         loadJSON(`./js/surah/${surahNumber}.json`)
             .then(data => {
                 currentSurahText = data;
-                displaySurahText(currentSurahText);
+                displaySurahText(currentSurahText, isMobile); // passe l'info mobile
                 resolve();
             })
             .catch(error => {
@@ -324,6 +342,7 @@ function loadSurahText(index) {
             });
     });
 }
+
 
 // === Hacker effect pour les textes (conservé uniquement pour chargement initial) ===
 function hackerEffect(element, originalText, speed = 20, step = 3) {
@@ -425,6 +444,7 @@ function createOverlay(data) {
     const label = document.createElement('span');
     label.className = 'label';
     label.textContent = '[all]';
+    label.setAttribute('ontouchend', '')
     label.onclick = () => {
         isPlayAll = !isPlayAll;
         if (isPlayAll) {
@@ -534,6 +554,161 @@ function createOverlay(data) {
     return overlay;
 }
 
+function createOverlayMobile(data) {
+    const overlay = document.getElementById('main-screen-phone');
+    // Réactive le scroll
+    document.documentElement.style.overflow = 'visible'; 
+    document.body.style.overflow = 'visible';          
+
+
+    // Rendre visible l'overlay mobile
+    overlay.style.display = 'block';
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'auto';
+
+    // Ajouter la classe mobile-overlay racine
+    overlay.classList.add('mobile-overlay');
+
+    const nameElement = document.querySelector('.sheikh-name');
+    nameElement.textContent = data.name;
+
+    if (data.photo) {
+        const photoElement = document.querySelector('.sheikh-photo');
+        photoElement.src = data.photo;
+        photoElement.alt = data.name;
+        photoElement.loading = "lazy";
+    }
+
+    if (data.bio) {
+        const bioContainer = document.createElement('div');
+        bioContainer.className = 'sheikh-bio';
+        const lines = data.bio.split(/(?<=\.)\s+/);
+        lines.forEach((line) => {
+            const span = document.createElement('span');
+            span.style.display = "inline";
+            span.style.whiteSpace = "normal";
+            span.textContent = line;
+            bioContainer.appendChild(span);
+            bioContainer.appendChild(document.createTextNode(" "));
+        });
+        overlay.appendChild(bioContainer);
+    }
+
+    // Media info
+    const mediaInfo = document.createElement('div');
+    mediaInfo.className = 'media-info-mobile';
+
+    const playSpan = document.createElement('span');
+    playSpan.className = 'action play mobile';
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = '[all]';
+    label.onclick = () => {
+        isPlayAll = !isPlayAll;
+        if (isPlayAll) {
+            label.classList.add('active');
+        } else {
+            label.classList.remove('active');
+        }
+    };
+    
+    const detailsDuration = document.createElement('span');
+    detailsDuration.className = 'details mobile';
+    detailsDuration.textContent = '...';
+
+    playSpan.appendChild(label);
+    playSpan.appendChild(detailsDuration);
+    mediaInfo.appendChild(playSpan);
+
+    const sourceSpan = document.createElement('span');
+    sourceSpan.className = 'action source mobile';
+    const labelsource = document.createElement('span');
+    labelsource.className = 'label';
+    labelsource.textContent = '[source]';
+
+    const detailsSize = document.createElement('span');
+    detailsSize.className = 'details mobile';
+    detailsSize.textContent = '...';
+    sourceSpan.appendChild(labelsource);
+    sourceSpan.appendChild(detailsSize);
+
+    mediaInfo.appendChild(sourceSpan);
+
+    const favoriteSpan = document.createElement('span');
+    favoriteSpan.className = 'fav mobile';
+
+    let favSheikhs = getCookie('favSheikhs');
+    favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+    const sheikhName = data.name;
+
+    if (favSheikhs.includes(sheikhName)) {
+        favoriteSpan.textContent = '[forget]';
+    } else {
+        favoriteSpan.textContent = '[favorite]';
+    }
+
+    favoriteSpan.onclick = () => {
+        let favSheikhs = getCookie('favSheikhs');
+        favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+
+        if (favSheikhs.includes(sheikhName)) {
+            favSheikhs = favSheikhs.filter(s => s !== sheikhName);
+            favoriteSpan.classList.remove('active');
+            favoriteSpan.textContent = '[favorite]';
+        } else {
+            favSheikhs.push(sheikhName);
+            favoriteSpan.classList.add('active');
+            favoriteSpan.textContent = '[forget]';
+        }
+
+        setCookie('favSheikhs', JSON.stringify(favSheikhs));
+        updateSheikhHighlights();
+    };
+
+    mediaInfo.appendChild(favoriteSpan);
+
+    const learning = document.createElement('span');
+    learning.className = 'learning mobile';
+    learning.textContent = '[learningPath]';
+    learning.onclick = () => {
+        isLearning = !isLearning;
+        if (isLearning) {
+            learning.classList.add('active');
+        } else {
+            learning.classList.remove('active');
+        }
+    };
+
+    mediaInfo.appendChild(learning);
+    overlay.appendChild(mediaInfo);
+    
+    const container = document.createElement('div');
+    container.className = 'souratesContainer';
+    container.innerHTML = "";
+
+    const list = document.createElement('div');
+    list.className = "sourate-list";
+    
+    sourates.forEach((sourate) => {
+        const item = document.createElement('li');
+        item.className = "sourate-item";
+        item.innerHTML = `
+            <span class="sourate-number">${sourate.number}</span> ${sourate.name}
+            <div class="sourate-arabic">${sourate.arabicname}</div>
+        `;
+        item.onclick = () => {
+            const sheikh = data;
+            loadAndPlaySourate(sheikh, sourates.indexOf(sourate));
+        };
+    
+        list.appendChild(item);
+    });
+    container.appendChild(list);
+    overlay.appendChild(container);
+
+    return overlay;
+}
+
 async function toggleSheikhInfo() {
     const sheikhInfo = document.querySelector('.sheikh-info');
     const container = document.querySelector('.sourate-container');
@@ -556,6 +731,7 @@ async function toggleSheikhInfo() {
             sheikhInfo.style.pointerEvents = 'none'; // Désactive les interactions
             container.style.opacity = '1';
             container.style.pointerEvents = 'auto'; // Réactive les interactions
+            container.style.display = 'block';
             displaySurahText(currentSurahText);
             
         } else {
@@ -565,17 +741,71 @@ async function toggleSheikhInfo() {
             sheikhInfo.style.pointerEvents = 'auto';
             container.style.opacity = '0';
             container.style.pointerEvents = 'none';
+            container.style.display = 'none';
         }
     }
 }
 
-function displaySurahText(surahData) {
-    const container = document.querySelector('.sourate-container');
+async function toggleMainScreenPhone() {
+    const mainScreenPhone = document.getElementById('main-screen-phone');
+    const container = document.getElementById('sourate-container-mobile');   
+
+    // Charger le texte de la sourate si nécessaire
+    if (!currentSurahText && currentSourateIndex !== undefined) {
+        try {
+            const surahNumber = String(currentSourateIndex + 1);
+            currentSurahText = await loadJSON(`./js/surah/${surahNumber}.json`);
+        } catch (error) {
+            console.error("Erreur chargement texte sourate:", error);
+            return;
+        }
+    }
+
+    if (mainScreenPhone) {
+        // Sélectionne tous les enfants sauf le premier
+        const children = Array.from(mainScreenPhone.children).slice(1);
+
+        if (container.style.opacity === '0') {
+            // Mode disparition
+            children.forEach(child => {
+                child.style.opacity = '0';
+                child.style.pointerEvents = 'none';
+            });
+            document.documentElement.style.overflow = 'hidden'; 
+            document.body.style.overflow = 'hidden';
+            container.style.opacity = '1';
+            container.style.display = 'block';
+            container.style.pointerEvents = 'auto';
+            displaySurahText(currentSurahText, true);
+        } else {
+            children.forEach(child => {
+                child.style.opacity = '1';
+                child.style.pointerEvents = 'auto';
+            });
+            document.documentElement.style.overflow = 'visible'; 
+            document.body.style.overflow = 'visible';
+            if (container) {
+                container.style.opacity = '0';
+                container.style.display = 'none';
+                container.style.pointerEvents = 'none';
+            }
+        }
+    }
+}
+
+function displaySurahText(surahData, isMobile) {
+    const containerSelector = isMobile ? 'sourate-container-mobile' : 'sourate-container';
+
+    const container = document.getElementById(containerSelector);
     container.innerHTML = ''; // Vide le conteneur
     
     const textContainer = document.createElement('div');
     textContainer.className = 'surah-text-container';
     textContainer.style.opacity = '0'; // Commence invisible
+
+    setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    }, 300);
     
     // Titre de la sourate avec animation
     const title = document.createElement('h3');
@@ -623,6 +853,7 @@ function displaySurahText(surahData) {
 
 
 document.querySelector('.circular-btn').addEventListener('click', toggleSheikhInfo);
+document.querySelector('.circular-btn').addEventListener('click', toggleMainScreenPhone);
 
 window.addEventListener("DOMContentLoaded", () => {
     const welcomeMessage = document.getElementById('welcome-message');
@@ -838,6 +1069,33 @@ function initCarouselLogic() {
         startAuto();
     }, 3000);
 
+    const pauseOnUserInteraction = () => {
+        pauseAuto();
+    };
+
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    $list.addEventListener("touchstart", (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    $list.addEventListener("touchend", (e) => {
+    touchEndX = e.changedTouches[0].screenX;
+    handleGesture();
+    }, { passive: true });
+
+    function handleGesture() {
+    const delta = touchEndX - touchStartX;
+    if (Math.abs(delta) < 30) return; // ignore petits mouvements
+
+    if (delta < 0) {
+        handleNextClick(); // swipe gauche → next
+    } else {
+        handlePrevClick(); // swipe droite → prev
+    }
+    }
+
     // === Activer le slide du milieu au chargement ===
     const slides = [...$q(".carousel__item")];
     const middleIndex = Math.floor(slides.length / 2);
@@ -852,7 +1110,9 @@ function initCarouselLogic() {
     const newCenter = $q(".carousel__item")[middleIndex];
     activateSlide(newCenter);
 
-
+    $list.addEventListener("touchstart", pauseOnUserInteraction, { passive: true });
+    $list.addEventListener("wheel", pauseOnUserInteraction, { passive: true });
+    $list.addEventListener("scroll", pauseOnUserInteraction, { passive: true });
     $list.addEventListener("keydown", handleSlideKey);
     $list.addEventListener("click", handleSlideClick);
     $prev.addEventListener("click", handlePrevClick);
@@ -878,9 +1138,16 @@ async function displaySheikhStats(sheikh) {  // On passe l'objet sheikh complet
     statsWorker = new Worker('./js/statsWorker.js');
     
     // Afficher un indicateur de chargement
-    document.getElementById('heures').textContent = '// ...';
-    document.getElementById('minutes').textContent = '// ...';
-    document.getElementById('secondes').textContent = '// ...';
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    if (isMobile) {
+        document.getElementById('heures-mobile').textContent = '// ...';
+        document.getElementById('minutes-mobile').textContent = '// ...';
+        document.getElementById('secondes-mobile').textContent = '// ...';
+    } else {
+        document.getElementById('heures').textContent = '// ...';
+        document.getElementById('minutes').textContent = '// ...';
+        document.getElementById('secondes').textContent = '// ...';
+    }
     
     statsWorker.onmessage = function(e) {
         const stats = e.data;
@@ -902,9 +1169,16 @@ async function displaySheikhStats(sheikh) {  // On passe l'objet sheikh complet
 }
 
 function updateStatsUI(stats) {
-    document.getElementById('heures').textContent = '// ' + stats.hours;
-    document.getElementById('minutes').textContent = '// ' + stats.minutes;
-    document.getElementById('secondes').textContent = '// ' + stats.seconds;
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    if (isMobile) {
+        document.getElementById('heures-mobile').textContent = '// ' + stats.hours;
+        document.getElementById('minutes-mobile').textContent = '// ' + stats.minutes;
+        document.getElementById('secondes-mobile').textContent = '// ' + stats.seconds;
+    } else {
+        document.getElementById('heures').textContent = '// ' + stats.hours;
+        document.getElementById('minutes').textContent = '// ' + stats.minutes;
+        document.getElementById('secondes').textContent = '// ' + stats.seconds;
+    }
 }
 
 
@@ -970,8 +1244,16 @@ window.initializeSheikh = function (index) {
 
         mainScreen.style.display = 'block';
 
-        const currentOverlay = document.querySelector('.sheikh-info');
-        let newOverlay = createOverlay(sheikh);
+        const currentOverlay = window.innerWidth <= 768
+            ? document.getElementById('main-screen-phone')
+            : document.querySelector('.sheikh-info');
+
+        let newOverlay;
+        if (window.innerWidth <= 768) {
+            newOverlay = createOverlayMobile(sheikh);
+        } else {
+            newOverlay = createOverlay(sheikh);
+        }
         newOverlay.style.opacity = '0'; // On cache
         document.body.appendChild(newOverlay);
 
@@ -1013,8 +1295,6 @@ window.initializeSheikh = function (index) {
     }, 500);
 };
 
-
-
 // === Animation en cascade à la fin du chargement (uniquement pour textes initiaux) ===
 window.addEventListener("DOMContentLoaded", () => {
 
@@ -1051,9 +1331,17 @@ window.addEventListener("DOMContentLoaded", () => {
             div.classList.add('active');
             const current = document.querySelector('.sheikh-info');
             if (current) {
-                current.replaceWith(createOverlay(sheikh));
+                if (window.innerWidth <= 768) {
+                    current.replaceWith(createOverlayMobile(sheikh));
+                } else {
+                    current.replaceWith(createOverlay(sheikh));
+                }
             } else {
-                document.body.appendChild(createOverlay(sheikh));
+                if (window.innerWidth <= 768) {
+                    document.body.appendChild(createOverlayMobile(sheikh));
+                } else {
+                    document.body.appendChild(createOverlay(sheikh));
+                }
             }
 
             const container = document.querySelector('.sourate-container');
@@ -1074,79 +1362,150 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 // Gestion des événements
-document.getElementById('play-pause').addEventListener('click', () => {
-    if (currentAudio) {
-        if (isPlaying) {
-            currentAudio.pause();
-            isPlaying = false;
-            document.getElementById('play-pause').textContent = '[play]';
-            clearInterval(updateInterval);
-            clearInterval(currentHighlightInterval); // Ajoute ceci aussi
-        } else {
-            currentAudio.currentTime = 0; // facultatif : remettre au début
-            currentAudio.play()
-                .then(() => {
-                    isPlaying = true;
-                    document.getElementById('play-pause').textContent = '[stop]';
-                    updateInterval = setInterval(updateCurrentTime, 1000);
+['play-pause', 'play-pause-mobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('click', () => {
+            if (currentAudio) {
+                if (isPlaying) {
+                    currentAudio.pause();
+                    isPlaying = false;
+                    el.textContent = '[play]';
+                    clearInterval(updateInterval);
+                    clearInterval(currentHighlightInterval);
+                } else {
+                    currentAudio.play()
+                        .then(() => {
+                            isPlaying = true;
+                            el.textContent = '[stop]';
+                            updateInterval = setInterval(updateCurrentTime, 1000);
 
-                    // 💡 Ajout pour relancer le surlignage
-                    if (currentHighlightInterval) clearInterval(currentHighlightInterval);
-                        currentHighlightInterval = setInterval(() => {
-                            highlightCurrentVerse();
-                        }, 200);
-                });
+                            if (currentHighlightInterval) clearInterval(currentHighlightInterval);
+                            currentHighlightInterval = setInterval(() => {
+                                highlightCurrentVerse();
+                            }, 200);
+                        });
+                }
+            }
+        });
+    }
+});
+
+
+['next-sourate', 'next-sourate-mobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('click', playNextSourate);
+    }
+});
+['prev-sourate', 'prev-sourate-mobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('click', playPrevSourate);
+    }
+});
+
+['forward-30', 'forward-30-mobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('click', () => {
+            if (currentAudio) {
+                currentAudio.currentTime = Math.min(currentAudio.currentTime + 30, currentAudio.duration);
+                updateCurrentTime();
+            }
+        });
+    }
+});
+
+['backward-30', 'backward-30-mobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('click', () => {
+            if (currentAudio) {
+                currentAudio.currentTime = Math.max(currentAudio.currentTime - 30, 0);
+                updateCurrentTime();
+            }
+        });
+    }
+});
+
+['volume-up', 'volume-up-mobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('click', () => {
+            currentVolume = Math.min(currentVolume + 0.1, 1.0);
+            if (currentAudio) currentAudio.volume = currentVolume;
+            const percent = Math.round(currentVolume * 100);
+            // Set the correct volume-level element depending on the button
+            if (id === 'volume-up') {
+                document.getElementById('volume-level').textContent =
+                    `${percent}%`.length === 3 ? `${percent}%` : ` ${percent}%`;
+            } else if (id === 'volume-up-mobile') {
+                const mobileLevel = document.getElementById('volume-level-mobile');
+                if (mobileLevel) {
+                    mobileLevel.textContent =
+                        `${percent}%`.length === 3 ? `${percent}%` : ` ${percent}%`;
+                }
+            }
+        });
+    }
+});
+
+['volume-down', 'volume-down-mobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('click', () => {
+            currentVolume = Math.max(currentVolume - 0.1, 0);
+            if (currentAudio) currentAudio.volume = currentVolume;
+            const percent = Math.round(currentVolume * 100);
+            // Set the correct volume-level element depending on the button
+            if (id === 'volume-down') {
+                document.getElementById('volume-level').textContent =
+                    `${percent}%`.length === 3 ? `${percent}%` : ` ${percent}%`;
+            } else if (id === 'volume-down-mobile') {
+                const mobileLevel = document.getElementById('volume-level-mobile');
+                if (mobileLevel) {
+                    mobileLevel.textContent =
+                        `${percent}%`.length === 3 ? `${percent}%` : ` ${percent}%`;
+                }
+            }
+        });
+    }
+});
+
+// Fonction pour basculer le mode loop
+function toggleLoopMode() {
+    isLoopEnabled = !isLoopEnabled;
+    
+    // Mettre à jour l'UI
+    ['loop-mode', 'loop-mode-mobile'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            const child = el.firstElementChild;
+            if (child) {
+                if (isLoopEnabled) {
+                    child.classList.add('active');
+                } else {
+                    child.classList.remove('active');
+                }
+            }
         }
+    });
+    
+    // Si on active le loop et qu'un audio est en cours, modifier son comportement
+    if (currentAudio && isLoopEnabled) {
+        currentAudio.loop = true;
+    } else if (currentAudio) {
+        currentAudio.loop = false;
+    }
+}
+
+['loop-mode', 'loop-mode-mobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('click', toggleLoopMode);
     }
 });
-
-
-document.getElementById('next-sourate').addEventListener('click', playNextSourate);
-document.getElementById('prev-sourate').addEventListener('click', playPrevSourate);
-
-document.getElementById('forward-30').addEventListener('click', () => {
-    if (currentAudio) {
-        currentAudio.currentTime = Math.min(currentAudio.currentTime + 30, currentAudio.duration);
-        updateCurrentTime();
-    }
-});
-
-document.getElementById('backward-30').addEventListener('click', () => {
-    if (currentAudio) {
-        currentAudio.currentTime = Math.max(currentAudio.currentTime - 30, 0);
-        updateCurrentTime();
-    }
-});
-
-document.getElementById('volume-up').addEventListener('click', () => {
-    currentVolume = Math.min(currentVolume + 0.1, 1.0);
-    if (currentAudio) currentAudio.volume = currentVolume;
-    const percent = Math.round(currentVolume * 100);
-    document.getElementById('volume-level').textContent = 
-    `${percent}%`.length === 3 ? `${percent}%` : ` ${percent}%`;
-});
-
-document.getElementById('volume-down').addEventListener('click', () => {
-    currentVolume = Math.max(currentVolume - 0.1, 0);
-    if (currentAudio) currentAudio.volume = currentVolume;
-    const percent = Math.round(currentVolume * 100);
-    document.getElementById('volume-level').textContent = 
-    `${percent}%`.length === 3 ? `${percent}%` : ` ${percent}%`;
-});
-
-document.getElementById('loop-mode').addEventListener('click', () => {
-    const Item = document.getElementById('loop-mode').textContent = '[loop]';
-    const activeItem = document.querySelector('.control-btn.active');
-    if (activeItem) {
-        activeItem.classList.remove('active');
-        isLoopMode = false;
-    }
-    else {
-        document.getElementById('loop-mode').classList.add('active');
-        isLoopMode = true;
-    }
-});
-
 
 // === Liste des sheikhs ===
 const sheikhs = [
