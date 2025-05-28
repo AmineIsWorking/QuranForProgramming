@@ -12,6 +12,7 @@ let currentSurahText = null;
 let isLoadingSourate = false;
 let isPlayAll = false;
 let isLearning = false;
+let carouselInitialized = false;
 const statsCache = {};
 
 // Fonction pour mettre à jour le nom de la sourate
@@ -127,8 +128,11 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                         return;
                     }
 
-                    const container = document.querySelector('.sourate-container');
-                    const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+                    const isMobile = window.matchMedia('(max-width: 1290px)').matches;
+                    const container = isMobile
+                        ? document.getElementById('sourate-container-mobile')
+                        : document.querySelector('.sourate-container');
+                    const sheikh = isMobile ? sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
 
                     if (isPlayAll && currentSourateIndex < sourates.length - 1) {
                         if (container.style.opacity === '1') {
@@ -273,8 +277,11 @@ function highlightCurrentVerse() {
 
 // Fonctions pour jouer suivant/précédent (version optimisée)
 function playNextSourate() {
-    const container = document.querySelector('.sourate-container');
-    const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+    const isMobile = window.matchMedia('(max-width: 1290px)').matches;
+    const container = isMobile
+        ? document.getElementById('sourate-container-mobile')
+        : document.querySelector('.sourate-container');
+    const sheikh = isMobile ? sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
     
     if (container.style.opacity === '1') {
         if (currentSourateIndex < sourates.length - 1) {
@@ -299,9 +306,11 @@ function playNextSourate() {
 }
 
 function playPrevSourate() {
-    const container = document.querySelector('.sourate-container');
-    const sheikh = sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
-    
+    const isMobile = window.matchMedia('(max-width: 1290px)').matches;
+    const container = isMobile
+        ? document.getElementById('sourate-container-mobile')
+        : document.querySelector('.sourate-container');
+    const sheikh = isMobile ? sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
     if (container.style.opacity === '1') {
         if (currentSourateIndex > 0) {
             container.style.transition = 'opacity 0.3s ease';
@@ -328,7 +337,7 @@ function loadSurahText(index) {
         const surahNumber = String(index + 1);
 
         // Détection automatique : moins de 768px = mobile
-        const isMobile = window.matchMedia('(max-width: 767px)').matches;
+        const isMobile = window.matchMedia('(max-width: 1290px)').matches;
         
         loadJSON(`./js/surah/${surahNumber}.json`)
             .then(data => {
@@ -554,6 +563,135 @@ function createOverlay(data) {
     return overlay;
 }
 
+function returnToCarousel() {
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
+    const sheikhcurrent = sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent);
+
+    // 1. Préparer les éléments
+    const activeSlide = document.querySelector('[data-active]');
+    const sheikhImg = activeSlide?.querySelector('img');
+    const overlayImg = document.querySelector('.sheikh-photo-mobile');
+
+    // 2. Cloner l'image de l'overlay
+    const imgRect = overlayImg.getBoundingClientRect();
+    const targetRect = sheikhImg.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(overlayImg);
+
+    const imgClone = overlayImg.cloneNode(true);
+    imgClone.style.position = 'fixed';
+    imgClone.style.top = `${imgRect.top}px`;
+    imgClone.style.left = `${imgRect.left}px`;
+    imgClone.style.width = `${imgRect.width}px`;
+    imgClone.style.height = `${imgRect.height}px`;
+    imgClone.style.zIndex = '9999';
+    imgClone.style.transition = 'all 0.8s ease-in-out';
+    imgClone.style.borderRadius = computedStyle.borderRadius;
+    imgClone.style.objectFit = computedStyle.objectFit;
+    imgClone.style.boxShadow = computedStyle.boxShadow;
+    imgClone.style.filter = computedStyle.filter;
+    imgClone.style.opacity = '1';
+
+    document.body.appendChild(imgClone);
+
+    // 3. Masquer l'écran principal pendant l'animation
+    // Attendre que le clone soit créé avant de masquer l'écran principal
+    setTimeout(() => {
+        const mainScreenPhone = document.getElementById('main-screen-phone');
+        if (mainScreenPhone) {
+            mainScreenPhone.style.opacity = '0';
+            mainScreenPhone.style.pointerEvents = 'none';
+            mainScreenPhone.style.display = 'none';
+        }
+    }, 200); // petit délai pour garantir que le clone est dans le DOM
+
+    // 4. Déclencher la transition de l'image vers sa position cible (slide)
+    requestAnimationFrame(() => {
+        imgClone.style.top = targetRect.top + 'px';
+        imgClone.style.left = targetRect.left + 'px';
+        imgClone.style.width = targetRect.width + 'px';
+        imgClone.style.height = targetRect.height + 'px';
+        imgClone.style.borderRadius = '16px'; // pour ressembler à la slide si elle est carrée
+    });
+    // 5. Après l'animation (0.8s), afficher le carousel + nettoyage
+    setTimeout(() => {
+        // Réactiver l'écran d'accueil
+        const welcomeMessage = document.querySelector('.welcome-message');
+        const welcomeScreen = document.querySelector('.welcome-screen');
+        if (welcomeMessage) {
+            welcomeMessage.classList.remove('fade-out');
+            welcomeMessage.style.display = 'inline';
+            welcomeMessage.style.opacity = '0';
+            welcomeMessage.style.pointerEvents = 'auto';
+            welcomeMessage.style.transition = 'opacity 1s ease-in';
+            setTimeout(() => {
+                welcomeMessage.style.opacity = '1';
+            }, 10);
+        }
+        if (welcomeScreen) {
+            welcomeScreen.classList.remove('fade-in');
+            welcomeScreen.style.display = 'block';
+            welcomeScreen.style.transition = 'opacity 0.8s ease';
+            welcomeScreen.style.opacity = '0';
+            welcomeScreen.style.pointerEvents = 'auto';
+            setTimeout(() => {
+            welcomeScreen.style.opacity = '1';
+            }, 100);
+        }
+
+        // Remove fade-in-up from carouselList
+        const carouselList = document.getElementById('sheikh-carousel');
+        if (carouselList) {
+            carouselList.classList.remove('fade-in-up');
+        }
+
+        // Mettre à jour les slides pour activer celui du sheikh
+        const slides = [...document.querySelectorAll(".carousel__item")];
+        slides.forEach((slide) => {
+            slide.classList.remove("exit-left", "exit-right");
+            slide.removeAttribute("data-active");
+            if (slide.querySelector('.sheikh__name')?.textContent === sheikhcurrent.name) {
+                slide.setAttribute("data-active", "true");
+            }
+        });
+
+        // Recentrer le carousel
+        const middleIndex = Math.floor(slides.length / 2);
+        const currentIndex = slides.findIndex(slide =>
+            slide.querySelector('.sheikh__name')?.textContent === sheikhcurrent.name
+        );
+        const offset = currentIndex - middleIndex;
+        if (offset > 0) {
+            for (let i = 0; i < offset; i++) {
+                const $first = document.querySelectorAll(".carousel__item")[0];
+                carouselList.append($first);
+            }
+        } else if (offset < 0) {
+            for (let i = 0; i < Math.abs(offset); i++) {
+                const $slides = document.querySelectorAll(".carousel__item");
+                const $last = $slides[$slides.length - 1];
+                carouselList.prepend($last);
+            }
+        }
+
+        // Nettoyage du clone
+        // Nettoyage du clone
+        setTimeout(() => {
+            imgClone.remove();
+        }, 100); // petit délai pour éviter un flash si la transition n'est pas terminée
+ 
+        // Redémarrer l’auto-slide
+        if (auto) clearInterval(auto);
+        auto = setInterval(() => {
+            const $slides = document.querySelectorAll(".carousel__item");
+            const $first = $slides[0];
+            document.querySelector(".carousel__list").append($first);
+            activateSlide(document.querySelectorAll(".carousel__item")[middleIndex]);
+        }, 5000);
+    }, 750); // délai = durée transition + 50ms
+}
+
 function createOverlayMobile(data) {
     const overlay = document.getElementById('main-screen-phone');
     // Réactive le scroll
@@ -569,143 +707,175 @@ function createOverlayMobile(data) {
     // Ajouter la classe mobile-overlay racine
     overlay.classList.add('mobile-overlay');
 
-    const nameElement = document.querySelector('.sheikh-name');
+    const nameElement = document.querySelector('.sheikh-name-mobile');
     nameElement.textContent = data.name;
 
     if (data.photo) {
-        const photoElement = document.querySelector('.sheikh-photo');
+        const photoElement = document.querySelector('.sheikh-photo-mobile');
         photoElement.src = data.photo;
         photoElement.alt = data.name;
         photoElement.loading = "lazy";
     }
 
     if (data.bio) {
-        const bioContainer = document.createElement('div');
-        bioContainer.className = 'sheikh-bio';
-        const lines = data.bio.split(/(?<=\.)\s+/);
-        lines.forEach((line) => {
-            const span = document.createElement('span');
-            span.style.display = "inline";
-            span.style.whiteSpace = "normal";
-            span.textContent = line;
-            bioContainer.appendChild(span);
-            bioContainer.appendChild(document.createTextNode(" "));
-        });
-        overlay.appendChild(bioContainer);
-    }
-
-    // Media info
-    const mediaInfo = document.createElement('div');
-    mediaInfo.className = 'media-info-mobile';
-
-    const playSpan = document.createElement('span');
-    playSpan.className = 'action play mobile';
-    const label = document.createElement('span');
-    label.className = 'label';
-    label.textContent = '[all]';
-    label.onclick = () => {
-        isPlayAll = !isPlayAll;
-        if (isPlayAll) {
-            label.classList.add('active');
-        } else {
-            label.classList.remove('active');
+        const bioContainer = document.querySelector('.sheikh-bio-mobile');
+        if (bioContainer) {
+            bioContainer.innerHTML = '';
+            const lines = data.bio.split(/(?<=\.)\s+/);
+            lines.forEach((line) => {
+                const span = document.createElement('span');
+                span.style.display = "inline";
+                span.style.whiteSpace = "normal";
+                span.textContent = line;
+                bioContainer.appendChild(span);
+                bioContainer.appendChild(document.createTextNode(" "));
+            });
         }
-    };
-    
-    const detailsDuration = document.createElement('span');
-    detailsDuration.className = 'details mobile';
-    detailsDuration.textContent = '...';
-
-    playSpan.appendChild(label);
-    playSpan.appendChild(detailsDuration);
-    mediaInfo.appendChild(playSpan);
-
-    const sourceSpan = document.createElement('span');
-    sourceSpan.className = 'action source mobile';
-    const labelsource = document.createElement('span');
-    labelsource.className = 'label';
-    labelsource.textContent = '[source]';
-
-    const detailsSize = document.createElement('span');
-    detailsSize.className = 'details mobile';
-    detailsSize.textContent = '...';
-    sourceSpan.appendChild(labelsource);
-    sourceSpan.appendChild(detailsSize);
-
-    mediaInfo.appendChild(sourceSpan);
-
-    const favoriteSpan = document.createElement('span');
-    favoriteSpan.className = 'fav mobile';
-
-    let favSheikhs = getCookie('favSheikhs');
-    favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
-    const sheikhName = data.name;
-
-    if (favSheikhs.includes(sheikhName)) {
-        favoriteSpan.textContent = '[forget]';
-    } else {
-        favoriteSpan.textContent = '[favorite]';
     }
 
-    favoriteSpan.onclick = () => {
+    // Vérifie si media-info-mobile existe déjà
+    if (overlay.querySelector('.media-info-mobile')) {
+        // Si déjà présent, ne rien faire
+    } else {
+        // Media info
+        const mediaInfo = document.createElement('div');
+        mediaInfo.className = 'media-info-mobile';
+
+        const playSpan = document.createElement('span');
+        playSpan.className = 'action play mobile';
+        const label = document.createElement('span');
+        label.className = 'label';
+        label.textContent = '[all]';
+        label.onclick = () => {
+            isPlayAll = !isPlayAll;
+            if (isPlayAll) {
+                label.classList.add('active');
+            } else {
+                label.classList.remove('active');
+            }
+        };
+        
+        const detailsDuration = document.createElement('span');
+        detailsDuration.className = 'details mobile';
+        detailsDuration.textContent = '...';
+
+        playSpan.appendChild(label);
+        playSpan.appendChild(detailsDuration);
+        mediaInfo.appendChild(playSpan);
+
+        const sourceSpan = document.createElement('span');
+        sourceSpan.className = 'action source mobile';
+        const labelsource = document.createElement('span');
+        labelsource.className = 'label';
+        labelsource.textContent = '[source]';
+
+        const detailsSize = document.createElement('span');
+        detailsSize.className = 'details mobile';
+        detailsSize.textContent = '...';
+        sourceSpan.appendChild(labelsource);
+        sourceSpan.appendChild(detailsSize);
+
+        mediaInfo.appendChild(sourceSpan);
+
+        const favoriteSpan = document.createElement('span');
+        favoriteSpan.className = 'fav mobile';
+
         let favSheikhs = getCookie('favSheikhs');
         favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
+        const sheikhName = data.name;
 
         if (favSheikhs.includes(sheikhName)) {
-            favSheikhs = favSheikhs.filter(s => s !== sheikhName);
-            favoriteSpan.classList.remove('active');
-            favoriteSpan.textContent = '[favorite]';
-        } else {
-            favSheikhs.push(sheikhName);
-            favoriteSpan.classList.add('active');
             favoriteSpan.textContent = '[forget]';
-        }
-
-        setCookie('favSheikhs', JSON.stringify(favSheikhs));
-        updateSheikhHighlights();
-    };
-
-    mediaInfo.appendChild(favoriteSpan);
-
-    const learning = document.createElement('span');
-    learning.className = 'learning mobile';
-    learning.textContent = '[learningPath]';
-    learning.onclick = () => {
-        isLearning = !isLearning;
-        if (isLearning) {
-            learning.classList.add('active');
         } else {
-            learning.classList.remove('active');
+            favoriteSpan.textContent = '[favorite]';
         }
-    };
 
-    mediaInfo.appendChild(learning);
-    overlay.appendChild(mediaInfo);
-    
-    const container = document.createElement('div');
-    container.className = 'souratesContainer';
-    container.innerHTML = "";
+        favoriteSpan.onclick = () => {
+            let favSheikhs = getCookie('favSheikhs');
+            favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
 
-    const list = document.createElement('div');
-    list.className = "sourate-list";
-    
-    sourates.forEach((sourate) => {
-        const item = document.createElement('li');
-        item.className = "sourate-item";
-        item.innerHTML = `
+            if (favSheikhs.includes(sheikhName)) {
+                favSheikhs = favSheikhs.filter(s => s !== sheikhName);
+                favoriteSpan.classList.remove('active');
+                favoriteSpan.textContent = '[favorite]';
+            } else {
+                favSheikhs.push(sheikhName);
+                favoriteSpan.classList.add('active');
+                favoriteSpan.textContent = '[forget]';
+            }
+
+            setCookie('favSheikhs', JSON.stringify(favSheikhs));
+            updateSheikhHighlights();
+        };
+
+        mediaInfo.appendChild(favoriteSpan);
+
+        const learning = document.createElement('span');
+        learning.className = 'learning mobile';
+        learning.textContent = '[learningPath]';
+        learning.onclick = () => {
+            isLearning = !isLearning;
+            if (isLearning) {
+                learning.classList.add('active');
+            } else {
+                learning.classList.remove('active');
+            }
+        };
+
+        mediaInfo.appendChild(learning);
+        overlay.appendChild(mediaInfo);
+
+    }
+        
+        // Vérifier si le container existe déjà
+        let container = overlay.querySelector('.souratesContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'souratesContainer';
+            container.innerHTML = "";
+        } else {
+            container.innerHTML = "";
+        }
+
+        // Vérifier si la liste existe déjà
+        let list = container.querySelector('.sourate-list');
+        if (!list) {
+            list = document.createElement('div');
+            list.className = "sourate-list";
+        } else {
+            list.innerHTML = "";
+        }
+        
+        // Remove existing sourate items if any
+        while (list.firstChild) {
+            list.removeChild(list.firstChild);
+        }
+
+        sourates.forEach((sourate) => {
+            const item = document.createElement('li');
+            item.className = "sourate-item";
+            item.innerHTML = `
             <span class="sourate-number">${sourate.number}</span> ${sourate.name}
             <div class="sourate-arabic">${sourate.arabicname}</div>
-        `;
-        item.onclick = () => {
+            `;
+            item.onclick = () => {
             const sheikh = data;
             loadAndPlaySourate(sheikh, sourates.indexOf(sourate));
-        };
-    
-        list.appendChild(item);
-    });
-    container.appendChild(list);
-    overlay.appendChild(container);
+            };
+        
+            list.appendChild(item);
+        });
+        container.appendChild(list);
+        overlay.appendChild(container);
 
+    const photo = overlay.querySelector('.sheikh-photo-mobile');
+    if (photo) {
+        photo.addEventListener('click', function(e) {
+            e.stopPropagation();
+            returnToCarousel();
+        });
+    }
+    
     return overlay;
 }
 
@@ -925,10 +1095,28 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Initialiser la logique du carrousel
-    initCarouselLogic();
+if (!carouselInitialized) {
+        initCarouselLogic();
+    }
 });
 
 function initCarouselLogic() {
+
+    if (carouselInitialized) {
+        const $prev = document.querySelector(".prev");
+        const $next = document.querySelector(".next");
+        const $list = document.querySelector(".carousel__list");
+        
+        // Cloner les éléments pour supprimer les écouteurs
+        if ($prev) $prev.replaceWith($prev.cloneNode(true));
+        if ($next) $next.replaceWith($next.cloneNode(true));
+        if ($list) $list.replaceWith($list.cloneNode(true));
+        
+        // Arrêter les intervalles existants
+        if (auto) clearInterval(auto);
+        if (pauser) clearTimeout(pauser);
+    }
+
     const d = document;
     const $q = d.querySelectorAll.bind(d);
     const $g = d.querySelector.bind(d);
@@ -1019,6 +1207,8 @@ function initCarouselLogic() {
             if (!window.isSheikhInitializing) {
                 window.isSheikhInitializing = true;
                 setTimeout(() => {
+                    pauseAuto();
+                    console.log("Ça doit plus tourner !");
                     initializeSheikh(index);
                     window.isSheikhInitializing = false;
                 }, 500); // durée identique à l'animation CSS
@@ -1062,12 +1252,12 @@ function initCarouselLogic() {
     };
 
     const startAuto = () => {
-        auto = setInterval(autoSlide, 3000);
+        auto = setInterval(autoSlide, 5000);
     };
 
     setTimeout(() => {
         startAuto();
-    }, 3000);
+    }, 5000);
 
     const pauseOnUserInteraction = () => {
         pauseAuto();
@@ -1118,9 +1308,10 @@ function initCarouselLogic() {
     $prev.addEventListener("click", handlePrevClick);
     $next.addEventListener("click", handleNextClick);
     $list.addEventListener("focusin", handleSlideClick);
+
+    carouselInitialized = true;
 }
 
-// Fonction pour afficher les stats
 // Fonction pour afficher les stats
 async function displaySheikhStats(sheikh) {  // On passe l'objet sheikh complet
     // Vérifier le cache d'abord
@@ -1138,7 +1329,7 @@ async function displaySheikhStats(sheikh) {  // On passe l'objet sheikh complet
     statsWorker = new Worker('./js/statsWorker.js');
     
     // Afficher un indicateur de chargement
-    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    const isMobile = window.matchMedia('(max-width: 1290px)').matches;
     if (isMobile) {
         document.getElementById('heures-mobile').textContent = '// ...';
         document.getElementById('minutes-mobile').textContent = '// ...';
@@ -1169,7 +1360,7 @@ async function displaySheikhStats(sheikh) {  // On passe l'objet sheikh complet
 }
 
 function updateStatsUI(stats) {
-    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    const isMobile = window.matchMedia('(max-width: 1290px)').matches;
     if (isMobile) {
         document.getElementById('heures-mobile').textContent = '// ' + stats.hours;
         document.getElementById('minutes-mobile').textContent = '// ' + stats.minutes;
@@ -1199,10 +1390,11 @@ window.initializeSheikh = function (index) {
     const sheikh = sortedSheikhs[index];
     displaySheikhStats(sheikh);
 
-    const welcomeMessage = document.querySelector('.welcome-message.up');
+    const welcomeMessage = document.querySelector('.welcome-message');
     const welcomeScreen = document.querySelector('.welcome-screen');
-    const mainScreen = document.getElementById('main-screen');
 
+    const mainScreen = document.getElementById('main-screen');
+    
     const activeSlide = document.querySelector('[data-active]');
 
     // === Cloner l'image ===
@@ -1228,35 +1420,40 @@ window.initializeSheikh = function (index) {
 
     document.body.appendChild(imgClone);
 
-
+    
     // Cacher temporairement menuL et menuR
     const menuL = document.querySelector('.menuL');
     const menuR = document.querySelector('.menuR');
     menuL.style.opacity = '0';
     menuR.style.opacity = '0';
-
+    
     // === Fade-out de l'écran de bienvenue ===
     welcomeMessage.classList.add('fade-out');
-
+    
     setTimeout(() => {
-        welcomeMessage.remove();
-        welcomeScreen.remove();
-
+        welcomeMessage.style.opacity = '0';
+        welcomeMessage.style.pointerEvents = 'none';
+        welcomeMessage.style.display = 'none';
+        welcomeScreen.style.opacity = '0';
+        welcomeScreen.style.transition = 'none'; // Remove transition for instant effect
+        welcomeScreen.style.pointerEvents = 'none';
+        
         mainScreen.style.display = 'block';
-
+        
         const currentOverlay = window.innerWidth <= 768
             ? document.getElementById('main-screen-phone')
             : document.querySelector('.sheikh-info');
-
+        
         let newOverlay;
         if (window.innerWidth <= 768) {
             newOverlay = createOverlayMobile(sheikh);
         } else {
             newOverlay = createOverlay(sheikh);
         }
+
         newOverlay.style.opacity = '0'; // On cache
         document.body.appendChild(newOverlay);
-
+        
         // === Transition de l'image ===
         const targetImg = newOverlay.querySelector('img');
         const targetRect = targetImg.getBoundingClientRect();
@@ -1514,63 +1711,54 @@ const sheikhs = [
         filename: "Mishari_Rashid_al_Afasy.json",
         photo: "./assets/images/Mishary-Rashid-Alafasy.jpeg",
         bio: "Mishary Rashid Alafasy, du Koweït, est mondialement reconnu pour sa voix apaisante et sa récitation émotive du Coran. Il a fondé la première chaîne de télévision entièrement dédiée à la récitation du Coran. Il est aussi le premier réciteur à avoir enregistré le Coran en entier dans les dix lectures (qira'at).",
-        audio: "https://server.com/audio/"
     },
     {
         name: "Mahmoud Khalil Al-Husary",
         filename: "Mahmoud_Khalil_Al_Husary.json",
         photo: "./assets/images/Mahmoud-Khalil-Al-Husary.jpeg",
         bio: "Mahmoud Khalil Al-Husary, un maître égyptien du tajwid, est connu pour sa récitation claire et méthodique. Il a été le premier réciteur à enregistrer le Coran complet en plusieurs styles de récitation, ce qui a grandement contribué à l'apprentissage du Coran dans le monde entier.",
-        audio: "https://server.com/audio/"
     },
     {
         name: "Sa'ud ash-Shuraim",
         filename: "Saud_ash_Shuraim.json",
         photo: "./assets/images/Saud-ash-Shuraim.jpeg",
         bio: "Saad Al-Ghamdi a mémorisé le Coran à l'âge de 22 ans et a ensuite étudié les dix lectures (al-qira'at al-‘ashr). Son enregistrement complet du Coran est l’un des plus utilisés dans les écoles coraniques du monde pour son style clair et parfait pour l’apprentissage.",
-        audio: "https://server.com/audio/"
     },
     {
         name: "AbdulBaset AbdulSamad",
         filename: "AbdulBaset_AbdulSamad.json",
         photo: "./assets/images/Abdul-Basit-Abdus-Samad.jpeg",
         bio: "Abdul Basit Abdus Samad, légende égyptienne du tajwid, est le seul réciteur à avoir conquis le cœur de millions dans le monde entier sans aucun média moderne à l’époque. Il a récité le Coran à l’ONU en 1970, un événement marquant où plusieurs non-musulmans furent émus aux larmes par sa récitation.",
-        audio: "https://server.com/audio/"
     },
     {
         name: "Abu Bakr al-Shatri",
         filename: "Abu_Bakr_al_Shatri.json",
         photo: "./assets/images/Abu-Bakr-al-Shatri.webp",
         bio: "Abu Bakr al-Shatri, connu pour sa récitation douce et mélodieuse, est un réciteur saoudien très apprécié. Il a participé à de nombreux événements islamiques internationaux et est souvent invité à diriger les prières dans différentes mosquées à travers le monde.",
-        audio: "https://server.com/audio/"
     },
     {
         name: "Khalifah Al Tunaiji",
         filename: "Khalifah_Al_Tunaiji.json",
         photo: "./assets/images/Khalifa-al-Tunaiji.jpeg",
         bio: "Khalifah Al Tunaiji, originaire des Émirats arabes unis, est connu pour sa récitation captivante et son engagement dans l'enseignement du Coran. Il a inspiré de nombreux étudiants à travers ses programmes éducatifs et ses récitations.",
-        audio: "https://server.com/audio/"
     },
     {
         name: "Hani ar-Rifai",
         filename: "Hani_ar_Rifai.json",
         photo: "./assets/images/Hani-ar-Rifai.jpeg",
         bio: "Hani ar-Rifai, imam de la mosquée Anani à Jeddah, est célèbre pour ses récitations émouvantes et ses dou’as pleines de ferveur. Sa voix unique a touché le cœur de millions de fidèles à travers le monde.",
-        audio: "https://server.com/audio/"
     },
     {
         name: "Mohamed Siddiq al-Minshawi",
         filename: "Mohamed_Siddiq_al_Minshawi.json",
         photo: "./assets/images/Mohamed-Siddiq-El-Minshawi.jpeg",
         bio: "Mohamed Siddiq al-Minshawi, un maître égyptien du tajwid, est connu pour sa récitation profonde et spirituelle. Il est considéré comme l'un des plus grands récitateurs de tous les temps, ayant influencé des générations de musulmans.",
-        audio: "https://server.com/audio/"
     },
     {
         name: "Abdur-Rahman as-Sudais",
         filename: "Abdur_Rahman_as_Sudais.json",
         photo: "./assets/images/Abdur-Rahman_As-Sudais.jpg",
         bio: "Abdur-Rahman As-Sudais a mémorisé le Coran à l’âge de 12 ans. Il est devenu imam de la Mosquée sacrée de La Mecque à seulement 22 ans. En 2005, il a été nommé 'Personnalité islamique de l’année'. Il a dirigé les prières du tarawih avec des millions de fidèles derrière lui, un record historique en nombre de participants à une prière collective.",
-        audio: "https://server.com/audio/"
     }
 ];
 
