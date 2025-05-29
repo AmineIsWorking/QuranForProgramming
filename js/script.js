@@ -733,6 +733,11 @@ function createOverlayMobile(data) {
         }
     }
 
+    const oKCookie = getCookie('oKCookie');
+    if (!oKCookie) {
+        showMobileCookieAlert(overlay);
+    }
+
     // Vérifie si media-info-mobile existe déjà
     if (overlay.querySelector('.media-info-mobile')) {
         // Si déjà présent, ne rien faire
@@ -1967,5 +1972,32 @@ function showCookieAlert() {
         setCookie('oKCookie', 'whatever');
         alert.remove();
         updateSheikhHighlights(); // met à jour les highlights après acceptation
+    });
+}
+
+function showMobileCookieAlert(container) {
+    if (document.getElementById('cookie-alert-mobile')) return;
+
+    const alert = document.createElement('div');
+    alert.id = 'cookie-alert-mobile';
+    alert.style.marginBottom = '2em';
+    alert.style.textAlign = 'center';
+    alert.style.display = 'flex';
+    alert.style.justifyContent = 'center';
+    alert.style.alignItems = 'center';
+    alert.style.width = '100%';
+
+    alert.innerHTML = `
+        <div style="color: #dddd25;">
+            Do you know cookies are a thing?<br>
+            <span id="ack-cookies-mobile" style="cursor: pointer;">[yes I'm aware]</span>
+        </div>
+    `;
+
+    container.appendChild(alert);
+
+    document.getElementById('ack-cookies-mobile').addEventListener('click', () => {
+        setCookie('oKCookie', 'whatever');
+        alert.remove();
     });
 }

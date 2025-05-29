@@ -875,7 +875,7 @@ body::-webkit-scrollbar,
     color: rgba(0, 0, 0, 0.899);
 }
 
-#ack-cookies {
+#ack-cookies, #ack-cookies-mobile{
   background: none;
   border: none;
   font-weight: bold;
@@ -891,7 +891,7 @@ body::-webkit-scrollbar,
   color: rgba(0, 0, 0, 0.899);
 }
 
-#cookie-alert {
+#cookie-alert, #cookie-alert-mobile {
     z-index: 1000;
 }
 
@@ -1148,6 +1148,10 @@ body::-webkit-scrollbar,
 
   .sourate-container {
     padding-left : 12px;
+  }
+
+  #ack-cookies-mobile:hover {
+    background-color: transparent;
   }
 
 }
