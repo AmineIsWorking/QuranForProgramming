@@ -187,7 +187,7 @@ body {
   width: 100%;
 }
 
-.sourate-container {
+#sourate-container {
     position: fixed;
     left: 350px; 
     right: 300px;
@@ -1146,12 +1146,20 @@ body::-webkit-scrollbar,
     padding-left: 0 !important;
   }
 
-  .sourate-container {
+  #sourate-container-mobile {
     padding-left : 12px;
   }
 
   #ack-cookies-mobile:hover {
     background-color: transparent;
+  }
+
+  #sourate-container-mobile {
+    padding-left: 120px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: left;
+    width: 100%;
   }
 
 }
