@@ -188,11 +188,14 @@ body {
 }
 
 .sourate-container {
-  padding-left: 120px;
-  box-sizing: border-box;
-  display: flex;
-  justify-content: left;
-  width: 100%;
+    position: fixed;
+    left: 350px; 
+    right: 300px;
+    width: auto; 
+    padding-left: 20px; 
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .menuR {
