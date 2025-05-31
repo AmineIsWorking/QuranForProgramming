@@ -1,4 +1,6 @@
 // Variables globales
+let isFirstPlay = true;
+let isInitialLoad = true;
 let statsWorker = null;
 let currentAudio = null;
 let currentSourateIndex = -1;
@@ -58,6 +60,12 @@ function updateCurrentTime() {
 
 // Fonction pour charger et jouer une sourate
 function loadAndPlaySourate(sheikh, sourateIndex) {
+
+    if (isFirstPlay && sourateIndex !== 0) {
+        isFirstPlay = false;
+        isPlayAll = false;
+    }
+
     if (isLoadingSourate) return;
     isLoadingSourate = true;
 
@@ -163,6 +171,8 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                     } else {
                         isPlayAll = false;
                         isPlaying = false;
+                        isFirstPlay = false;
+                        isPlayAll = false;
                         ['play-pause', 'play-pause-mobile'].forEach(id => {
                             const el = document.getElementById(id);
                             if (el) el.textContent = '[play]';
@@ -1213,7 +1223,6 @@ function initCarouselLogic() {
                 window.isSheikhInitializing = true;
                 setTimeout(() => {
                     pauseAuto();
-                    console.log("Ça doit plus tourner !");
                     initializeSheikh(index);
                     window.isSheikhInitializing = false;
                 }, 500); // durée identique à l'animation CSS
@@ -1568,14 +1577,38 @@ window.addEventListener("DOMContentLoaded", () => {
     const el = document.getElementById(id);
     if (el) {
         el.addEventListener('click', () => {
-            if (currentAudio) {
-                if (isPlaying) {
-                    currentAudio.pause();
-                    isPlaying = false;
-                    el.textContent = '[play]';
-                    clearInterval(updateInterval);
-                    clearInterval(currentHighlightInterval);
+            if (isInitialLoad || !currentAudio) {
+                // Premier chargement ou pas d'audio chargé
+                isInitialLoad = false;
+                isFirstPlay = true;
+                isPlayAll = true;
+                
+                loadAndPlaySourate(window.matchMedia('(max-width: 1290px)').matches ?
+                    sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : 
+                    sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent), 0); // Commence par la première sourate
+                return;
+            }
+
+            if (isPlaying) {
+                // Comportement normal stop
+                currentAudio.pause();
+                isPlaying = false;
+                el.textContent = '[play]';
+                clearInterval(updateInterval);
+                clearInterval(currentHighlightInterval);
+                isFirstPlay = false;
+            } else {
+                if (isFirstPlay) {
+                    // Mode première lecture
+                    isPlayAll = true;
+                        
+                    loadAndPlaySourate(window.matchMedia('(max-width: 1290px)').matches ? 
+                        sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : 
+                        sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent)
+                    , 0);
+                    
                 } else {
+                    // Comportement normal play
                     currentAudio.play()
                         .then(() => {
                             isPlaying = true;
@@ -1592,7 +1625,6 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
-
 
 ['next-sourate', 'next-sourate-mobile'].forEach(id => {
     const el = document.getElementById(id);
