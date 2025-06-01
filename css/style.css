@@ -924,7 +924,7 @@ body::-webkit-scrollbar,
     cursor: not-allowed;
 }
 
-@media screen and (max-width: 1290px) {
+@media screen and (max-width: 600px) {
 
   html, body {
     width: 100vw;          
