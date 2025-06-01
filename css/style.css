@@ -98,6 +98,16 @@ body {
   opacity: 1;
 }
 
+.welcome-animation {
+  max-width: 100%;
+  max-height: 80%;
+  object-fit: contain;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 0;
+  margin-bottom: 0;
+}
 
 @keyframes fadeInUp {
     from {
@@ -305,7 +315,6 @@ body {
 
 .sourate-marquee {
   display: inline-block;
-  position: relative;
   animation: marquee-step 20s steps(20) infinite;
   font-weight: bold;
   color: #898989;
@@ -808,7 +817,6 @@ audio {
   font-family: 'Quran';
   text-align: right;
   direction: rtl;
-  position: relative;
 }
 
 
@@ -893,6 +901,27 @@ body::-webkit-scrollbar,
 
 #cookie-alert, #cookie-alert-mobile {
     z-index: 1000;
+}
+
+.control-disabled,
+.control-disabled > .label,
+#volume-down.control-disabled > .label, 
+#volume-up.control-disabled > .label, 
+#loop-mode.control-disabled > .label {
+    opacity: 0.5;
+    color: #555 !important;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+#prev-sourate.control-disabled, 
+#prev-sourate-mobile.control-disabled,
+#next-sourate.control-disabled,
+#next-sourate-mobile.control-disabled {
+    opacity: 0.5;
+    color: #555 !important;
+    pointer-events: none;
+    cursor: not-allowed;
 }
 
 @media screen and (max-width: 1290px) {

@@ -1,6 +1,7 @@
 // Variables globales
 let isFirstPlay = true;
 let isInitialLoad = true;
+let controlsInitialized = false;
 let statsWorker = null;
 let currentAudio = null;
 let currentSourateIndex = -1;
@@ -16,6 +17,80 @@ let isPlayAll = false;
 let isLearning = false;
 let carouselInitialized = false;
 const statsCache = {};
+
+// Fonction pour désactiver les contrôles
+function disableControls() {
+    const controlsToDisable = [
+        'prev-sourate', 'prev-sourate-mobile',
+        'backward-30', 'backward-30-mobile',
+        'forward-30', 'forward-30-mobile',
+        'next-sourate', 'next-sourate-mobile',
+        'current-time', 'current-time-mobile',
+        'volume-down', 'volume-down-mobile',
+        'volume-level', 'volume-level-mobile',
+        'volume-up', 'volume-up-mobile',
+        'loop-mode', 'loop-mode-mobile'
+    ];
+
+    controlsToDisable.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('control-disabled');
+    });
+}
+
+// Fonction pour activer les contrôles
+function enableControls() {
+    const controlsToEnable = [
+        'prev-sourate', 'prev-sourate-mobile',
+        'backward-30', 'backward-30-mobile',
+        'forward-30', 'forward-30-mobile',
+        'next-sourate', 'next-sourate-mobile',
+        'current-time', 'current-time-mobile',
+        'volume-down', 'volume-down-mobile',
+        'volume-level', 'volume-level-mobile',
+        'volume-up', 'volume-up-mobile',
+        'loop-mode', 'loop-mode-mobile'
+    ];
+
+    controlsToEnable.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('control-disabled');
+    });
+
+    controlsInitialized = true;
+}
+
+function updateNavigationButtons() {
+    // Désactiver [prev] si on est sur la première sourate
+    const prevButtons = ['prev-sourate', 'prev-sourate-mobile'];
+    const shouldDisablePrev = currentSourateIndex <= 0;
+    
+    prevButtons.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            if (shouldDisablePrev) {
+                el.classList.add('control-disabled');
+            } else {
+                el.classList.remove('control-disabled');
+            }
+        }
+    });
+
+    // Désactiver [next] si on est sur la dernière sourate
+    const nextButtons = ['next-sourate', 'next-sourate-mobile'];
+    const shouldDisableNext = currentSourateIndex >= sourates.length - 1;
+    
+    nextButtons.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            if (shouldDisableNext) {
+                el.classList.add('control-disabled');
+            } else {
+                el.classList.remove('control-disabled');
+            }
+        }
+    });
+}
 
 // Fonction pour mettre à jour le nom de la sourate
 function updateSourateName(sourate) {
@@ -71,6 +146,7 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
 
     const sourate = sourates[sourateIndex];
     currentSourateIndex = sourateIndex;
+    updateNavigationButtons();
     currentSurahText = null;
     
     // Arrêter tout surlignage en cours
@@ -93,6 +169,11 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                 currentSourateAudioUrl = audioUrl; // Stocker l'URL courante
                 
                 currentAudio = new Audio(audioUrl);
+                currentAudio.onplay = () => {
+                    if (!controlsInitialized) {
+                        enableControls();
+                    }
+                };
                 currentAudio.volume = currentVolume;
                 currentAudio.loop = isLoopEnabled;
                 currentVerseTimings = surahData["audio_files"][0]["verse_timings"];
@@ -129,6 +210,7 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                 currentAudio.onended = () => {
                     clearInterval(updateInterval);
                     clearInterval(currentHighlightInterval);
+                    updateNavigationButtons();
 
                     if (isLoopEnabled) {
                         currentAudio.currentTime = 0;
@@ -305,6 +387,9 @@ function playNextSourate() {
                     container.style.opacity = '1';
                 });
             }, 300);
+        } else {
+            updateNavigationButtons();
+            return;
         }
     } else if (currentAudio) {
         // Mode audio seul
@@ -332,6 +417,9 @@ function playPrevSourate() {
                     container.style.opacity = '1';
                 });
             }, 300);
+        } else {
+            updateNavigationButtons();
+            return;
         }
     } else if (currentAudio) {
         currentAudio.pause();
@@ -562,6 +650,10 @@ function createOverlay(data) {
                           <div class="sourate-arabic">${sourate.arabicname}</div>
         `;
         item.onclick = () => {
+            isInitialLoad = false;
+            if (!controlsInitialized) {
+                enableControls();
+            }
             const sheikh = data;
             loadAndPlaySourate(sheikh, sourates.indexOf(sourate));
         };
@@ -1040,33 +1132,37 @@ function displaySurahText(surahData, isMobile) {
 document.querySelector('.circular-btn').addEventListener('click', toggleSheikhInfo);
 document.querySelector('.circular-btn').addEventListener('click', toggleMainScreenPhone);
 
-window.addEventListener("DOMContentLoaded", () => {
-    const welcomeMessage = document.getElementById('welcome-message');
+window.onload = () => {
+  const welcomeMessage = document.getElementById('welcome-message');
 
-    const originalText = welcomeMessage.textContent;
+  // Crée une balise image neuve avec un timestamp pour forcer le cache
+  const gifImg = document.createElement('img');
+  gifImg.src = `./assets/videos/welcome.gif?${Date.now()}`;
+  gifImg.className = 'welcome-animation';
+
+  welcomeMessage.innerHTML = '';
+  welcomeMessage.appendChild(gifImg);
+
+  setTimeout(() => {
+    welcomeMessage.style.display = 'none';
+    welcomeMessage.innerHTML = '';
+  }, 8500);
+
+  setTimeout(() => {
+    const newText = "Select your Sheikh to start:";
     welcomeMessage.textContent = "";
-    hackerEffect(welcomeMessage, originalText);
+    welcomeMessage.style.display = 'block';
+    hackerEffect(welcomeMessage, newText);
+    welcomeMessage.classList.add('up');
+  }, 8500);
 
-    setTimeout(() => {
-        welcomeMessage.style.display = 'none';
-    }, 3000);
-
-    setTimeout(() => {
-        const newText = "Select your Sheikh to start:";
-        welcomeMessage.textContent = "";
-        welcomeMessage.style.display = 'block';
-        hackerEffect(welcomeMessage, newText);
-        welcomeMessage.classList.add('up');
-    }, 3000);
-
-    const carouselList = document.getElementById('sheikh-carousel');
-    const welcomeScreen = document.querySelector('.welcome-screen');
-    setTimeout(() => {
-        carouselList.classList.add('fade-in-up');
-        welcomeScreen.classList.add('fade-in');
-    }, 3500);
-
-});
+  const carouselList = document.getElementById('sheikh-carousel');
+  const welcomeScreen = document.querySelector('.welcome-screen');
+  setTimeout(() => {
+    carouselList.classList.add('fade-in-up');
+    welcomeScreen.classList.add('fade-in');
+  }, 9000);
+};
 
 
 // === Initialisation du carrousel ===
@@ -1481,7 +1577,9 @@ window.initializeSheikh = function (index) {
 
         // === Une fois l'image en place ===
         setTimeout(() => {
-            // 🆕 Afficher doucement menuL et menuR
+            // Afficher doucement menuL et menuR
+            updateNavigationButtons();
+            disableControls();
             menuL.style.transition = 'opacity 0.4s ease';
             menuR.style.transition = 'opacity 0.4s ease';
             menuL.style.opacity = '1';
@@ -1585,7 +1683,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 
                 loadAndPlaySourate(window.matchMedia('(max-width: 1290px)').matches ?
                     sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : 
-                    sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent), 0); // Commence par la première sourate
+                    sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent), 0); 
                 return;
             }
 
@@ -1598,29 +1696,20 @@ window.addEventListener("DOMContentLoaded", () => {
                 clearInterval(currentHighlightInterval);
                 isFirstPlay = false;
             } else {
-                if (isFirstPlay) {
-                    // Mode première lecture
-                    isPlayAll = true;
-                        
-                    loadAndPlaySourate(window.matchMedia('(max-width: 1290px)').matches ? 
-                        sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : 
-                        sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent)
-                    , 0);
-                    
-                } else {
-                    // Comportement normal play
-                    currentAudio.play()
-                        .then(() => {
-                            isPlaying = true;
-                            el.textContent = '[stop]';
-                            updateInterval = setInterval(updateCurrentTime, 1000);
+                currentAudio.play()
+                    .then(() => {
+                        if (!controlsInitialized) {
+                            enableControls();
+                        }
+                        isPlaying = true;
+                        el.textContent = '[stop]';
+                        updateInterval = setInterval(updateCurrentTime, 1000);
 
-                            if (currentHighlightInterval) clearInterval(currentHighlightInterval);
-                            currentHighlightInterval = setInterval(() => {
-                                highlightCurrentVerse();
-                            }, 200);
-                        });
-                }
+                        if (currentHighlightInterval) clearInterval(currentHighlightInterval);
+                        currentHighlightInterval = setInterval(() => {
+                            highlightCurrentVerse();
+                        }, 200);
+                    });
             }
         });
     }
