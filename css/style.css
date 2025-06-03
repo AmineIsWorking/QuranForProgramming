@@ -924,6 +924,17 @@ body::-webkit-scrollbar,
     cursor: not-allowed;
 }
 
+.tutorial-overlay {
+    pointer-events: auto !important;
+}
+.tutorial-message {
+    animation: fadeInUp 0.4s;
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px);}
+    to { opacity: 1; transform: translateY(0);}
+}
+
 @media screen and (max-width: 600px) {
 
   html, body {

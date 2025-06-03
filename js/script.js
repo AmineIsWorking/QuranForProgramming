@@ -18,6 +18,266 @@ let isLearning = false;
 let carouselInitialized = false;
 const statsCache = {};
 
+// === Tutoriel interactif avec effet "spotlight" ===
+let tutorialStep = 0;
+let tutorialOverlay = null;
+let originalCircularBtnDisplay = null;
+const tutorialConfig = [
+    {
+        target: null,
+        message: "As-salāmu ʿalaykum ! Ce tutoriel interactif va vous guider pour profiter pleinement du site.",
+        placement: "center"
+    },
+    {
+        target: ".souratesContainer",
+        message: "Voici la liste des sourates du Coran. Cliquez sur une sourate lancer la lecture audio.",
+        placement: "top"
+    },
+    {
+        target: ".control-row",
+        message: "Utilisez ces boutons pour contrôler la lecture :<ul><li>▶️ Lecture/Pause</li><li>⏭️ Sourate suivante</li><li>⏮️ Sourate précédente</li><li>⏩ Avance rapide (30s)</li><li>⏪ Retour rapide (30s)</li><li>🔊 Réglage du volume</li></ul>",
+        placement: "right"
+    },
+    {
+        target: "#menuR",
+        message: "Ce menu vous permet de changer de sheikh à tout moment. Cliquez sur un nom pour découvrir son style de récitation.",
+        placement: "bottom"
+    },
+    {
+        target: ".circular-btn",
+        message: "Cliquez ici pour afficher ou masquer le texte de la sourate.",
+        placement: "top"
+    },
+    {
+        target: ".media-info",
+        message: 'Ici, vous pouvez :<ul><li>Activer le mode "All" pour écouter toutes les sourates à la suite</li><li>Activer "Learning Path" pour réviser dans l\'ordre inverse</li></ul>Ajouter un réciteur à vos favoris ! ⭐',
+        placement: "right"
+    },
+    {
+        target: null,
+        message: "Barak-Allahu fikum !<br>Qu'Allah facilite votre chemin vers la connaissance du Coran.",
+        placement: "center"
+    }
+];
+
+function startTutorial() {
+    tutorialStep = 0;
+
+    // Sauvegarder et modifier l'affichage du bouton
+    const circularBtn = document.querySelector('.circular-btn');
+    if (circularBtn) {
+        originalCircularBtnDisplay = circularBtn.style.display; // Sauvegarder l'état original
+        circularBtn.style.display = 'flex';
+    }
+
+    showTutorialStep();
+    setCookie('tuto', 'done', 365);
+}
+
+
+function showTutorialStep() {
+    removeTutorialOverlay();
+
+    if (tutorialStep >= tutorialConfig.length) {
+        // Restaurer l'affichage original du bouton
+        const circularBtn = document.querySelector('.circular-btn');
+        if (circularBtn && originalCircularBtnDisplay !== null) {
+            circularBtn.style.display = originalCircularBtnDisplay;
+        } else if (circularBtn) {
+            circularBtn.style.display = 'none'; // Fallback si l'état original n'est pas disponible
+        }
+
+        removeTutorialOverlay();
+        return;
+    }
+
+    const step = tutorialConfig[tutorialStep];
+    const targetEl = step.target ? document.querySelector(step.target) : null;
+
+    if (step.target && !targetEl) {
+        tutorialStep++;
+        showTutorialStep();
+        return;
+    }
+
+    createTutorialOverlay(step, targetEl);
+}
+
+function createTutorialOverlay(step, targetEl) {
+    // Créer l'overlay
+    tutorialOverlay = document.createElement('div');
+    tutorialOverlay.className = 'tutorial-overlay';
+    Object.assign(tutorialOverlay.style, {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 99999,
+        pointerEvents: 'auto'
+    });
+
+    // Calculer la position du trou avec une valeur par défaut pour rx
+    const hole = calculateHolePosition(targetEl);
+    
+    // Ajouter le masque SVG
+    tutorialOverlay.innerHTML = createSvgMask(hole);
+    
+    // Créer et positionner le message
+    const msgBox = createMessageBox(step, hole);
+    tutorialOverlay.appendChild(msgBox);
+
+    // Gestion des événements
+    setupEventListeners();
+
+    document.body.appendChild(tutorialOverlay);
+}
+
+function calculateHolePosition(targetEl) {
+    const padding = 12;
+    const borderRadius = 12; // Valeur fixe pour rx
+    
+    if (!targetEl) {
+        return { 
+            x: -1000, 
+            y: -1000, 
+            width: 0, 
+            height: 0,
+            rx: 0
+        };
+    }
+    
+    const rect = targetEl.getBoundingClientRect();
+    return {
+        x: rect.left - padding,
+        y: rect.top - padding,
+        width: rect.width + 2 * padding,
+        height: rect.height + 2 * padding,
+        rx: borderRadius
+    };
+}
+
+function createSvgMask(hole) {
+    return `
+        <svg width="100%" height="100%" style="position:absolute;top:0;left:0;pointer-events:none;">
+            <defs>
+                <mask id="spotlight-mask">
+                    <rect x="0" y="0" width="100%" height="100%" fill="white"/>
+                    <rect x="${hole.x}" y="${hole.y}" width="${hole.width}" height="${hole.height}" rx="${hole.rx}" fill="black"/>
+                </mask>
+            </defs>
+            <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.8)" mask="url(#spotlight-mask)"/>
+        </svg>
+    `;
+}
+
+function createMessageBox(step, hole) {
+    const msgBox = document.createElement('div');
+    msgBox.className = 'tutorial-message';
+    Object.assign(msgBox.style, {
+        position: 'absolute',
+        maxWidth: '320px',
+        background: '#222',
+        color: '#fff',
+        padding: '1em 1.2em',
+        borderRadius: '12px',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+        zIndex: 100000,
+        fontSize: '1.1em'
+    });
+
+    msgBox.innerHTML = `
+        <div style="margin-bottom:1em;">${step.message}</div>
+        <button id="tutorial-next-btn" style="background:#ffd600;color:#222;border:none;padding:0.5em 1.2em;border-radius:8px;cursor:pointer;font-weight:bold;">Suivant</button>
+    `;
+
+    const { top, left } = calculateMessagePosition(step.placement, hole, msgBox);
+    msgBox.style.top = `${top}px`;
+    msgBox.style.left = `${left}px`;
+
+    return msgBox;
+}
+
+function calculateMessagePosition(placement, hole, msgBox) {
+    let top, left;
+    const msgBoxHeight = 120;
+    
+    switch (placement) {
+        case 'top':
+            top = hole.y - (msgBox.offsetHeight || msgBoxHeight) - 70;
+            left = hole.x + hole.width / 2 - 160;
+            break;
+        case 'bottom':
+            top = hole.y + hole.height + 20;
+            left = hole.x + hole.width / 2 - 160;
+            break;
+        case 'left':
+            top = hole.y + hole.height / 2 - 40;
+            left = hole.x - 340;
+            break;
+        case 'right':
+            top = hole.y + hole.height / 2 - 40;
+            left = hole.x + hole.width + 20;
+            break;
+        default:
+            top = window.innerHeight / 2 - 60;
+            left = window.innerWidth / 2 - 160;
+    }
+
+    return {
+        top: Math.max(20, Math.min(top, window.innerHeight - (msgBox.offsetHeight || msgBoxHeight))),
+        left: Math.max(20, Math.min(left, window.innerWidth - 340))
+    };
+}
+
+function setupEventListeners() {
+    // Empêcher les clics sur l'overlay de se propager
+    tutorialOverlay.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+
+    // Gestion du bouton Suivant
+    const nextBtn = tutorialOverlay.querySelector('#tutorial-next-btn');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            tutorialStep++;
+            showTutorialStep();
+        });
+    }
+}
+
+function removeTutorialOverlay() {
+    if (tutorialOverlay) {
+        tutorialOverlay.remove();
+        tutorialOverlay = null;
+    }
+}
+
+// === Observateur pour lancement automatique ===
+const observer = new MutationObserver((mutationsList) => {
+    for (const mutation of mutationsList) {
+        if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeType === 1 &&
+                    node.classList.contains('sheikh-info') &&
+                    !getCookie('tuto')) {
+                    setTimeout(() => {
+                        if (!getCookie('tuto')) startTutorial();
+                    }, 1000);
+                }
+            });
+        }
+    }
+});
+
+if (document.body) {
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
+window.startTutorial = startTutorial;
+
+
 // Fonction pour désactiver les contrôles
 function disableControls() {
     const controlsToDisable = [
@@ -1132,21 +1392,32 @@ function displaySurahText(surahData, isMobile) {
 document.querySelector('.circular-btn').addEventListener('click', toggleSheikhInfo);
 document.querySelector('.circular-btn').addEventListener('click', toggleMainScreenPhone);
 
-window.onload = () => {
-  const welcomeMessage = document.getElementById('welcome-message');
+window.onload = async () => {
+    const welcomeMessage = document.getElementById('welcome-message');
 
-  // Crée une balise image neuve avec un timestamp pour forcer le cache
-  const gifImg = document.createElement('img');
-  gifImg.src = `./assets/videos/welcome.gif?${Date.now()}`;
-  gifImg.className = 'welcome-animation';
+    // Crée une balise image neuve avec un timestamp pour forcer le cache
+    const gifImg = document.createElement('img');
+    gifImg.src = `./assets/videos/welcome.gif?${Date.now()}`;
+    gifImg.className = 'welcome-animation';
 
-  welcomeMessage.innerHTML = '';
-  welcomeMessage.appendChild(gifImg);
+    // Crée et joue l'audio Bismillah en même temps que le gif
+    const audio = new Audio('./assets/audio/Bismillah.mp3');
+    audio.muted = true; // hack
+    audio.play().then(() => {
+        audio.pause();
+        audio.muted = false;
+        audio.currentTime = 0;
+        return audio.play(); // relance sans mute
+    }).catch(err => {
+    });
 
-  setTimeout(() => {
-    welcomeMessage.style.display = 'none';
     welcomeMessage.innerHTML = '';
-  }, 8500);
+    welcomeMessage.appendChild(gifImg);
+
+    setTimeout(() => {
+        welcomeMessage.style.display = 'none';
+        welcomeMessage.innerHTML = '';
+    }, 8500);
 
   setTimeout(() => {
     const newText = "Select your Sheikh to start:";
