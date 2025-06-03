@@ -277,6 +277,302 @@ if (document.body) {
 
 window.startTutorial = startTutorial;
 
+// === Tutoriel interactif mobile avec effet "spotlight" ===
+let mobileTutorialStep = 0;
+let mobileTutorialOverlay = null;
+
+const mobileTutorialConfig = [
+    {
+        target: null,
+        message: "As-salāmu ʿalaykum ! Ce tutoriel interactif va vous guider pour profiter pleinement du site.",
+        placement: "center"
+    },
+    {
+        target: ".sheikh-photo-mobile",
+        message: "Voici la photo du sheikh sélectionné. Touchez-la pour changer de sheikh.",
+        placement: "top"
+    },
+    {
+        target: ".control-row-mobile",
+        message: "Contrôlez la lecture ici : lecture/pause, suivant/précédent...",
+        placement: "top"
+    },
+    {
+        target: ".media-info-mobile",
+        message: 'Ici, vous pouvez :<ul><li>Activer le mode "All" pour écouter toutes les sourates à la suite</li><li>Activer "Learning Path" pour réviser dans l\'ordre inverse</li></ul>Ajouter un réciteur à vos favoris ! ⭐',
+        placement: "bottom"
+    },
+    {
+        target: ".souratesContainer",
+        message: "Faites défiler la liste pour choisir une sourate à écouter.",
+        placement: "top"
+    },
+    {
+        target: ".circular-btn",
+        message: "Ce bouton permet d'afficher/masquer le texte de la sourate.",
+        placement: "top"
+    },
+    {
+        target: null,
+        message: "Barak-Allahu fikum !<br>Qu'Allah facilite votre chemin vers la connaissance du Coran.",
+        placement: "center"
+    }
+];
+
+function startMobileTutorial() {
+    mobileTutorialStep = 0;
+    const circularBtn = document.querySelector('.circular-btn');
+    if (circularBtn) {
+        originalCircularBtnDisplay = circularBtn.style.display;
+        circularBtn.style.display = 'flex';
+    }
+    showMobileTutorialStep();
+    setCookie('tutoMobile', 'done', 365);
+}
+
+function showMobileTutorialStep() {
+    removeMobileTutorialOverlay();
+
+    if (mobileTutorialStep >= mobileTutorialConfig.length) {
+        const circularBtn = document.querySelector('.circular-btn');
+        if (circularBtn) {
+            circularBtn.style.display = originalCircularBtnDisplay || 'none';
+        }
+        removeMobileTutorialOverlay();
+        return;
+    }
+
+    const step = mobileTutorialConfig[mobileTutorialStep];
+    const targetEl = step.target ? document.querySelector(step.target) : null;
+
+    if (step.target && !targetEl) {
+        mobileTutorialStep++;
+        showMobileTutorialStep();
+        return;
+    }
+
+    // Faire défiler jusqu'à l'élément cible si nécessaire
+    if (targetEl) {
+        scrollToElement(targetEl).then(() => {
+            createMobileTutorialOverlay(step, targetEl);
+        });
+    } else {
+        createMobileTutorialOverlay(step, targetEl);
+    }
+}
+
+function scrollToElement(element) {
+    return new Promise((resolve) => {
+        // Vérifier si l'élément est déjà visible
+        const rect = element.getBoundingClientRect();
+        const isVisible = (
+            rect.top >= 0 &&
+            rect.left >= 0 &&
+            rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+            rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+        );
+
+        if (isVisible) {
+            resolve();
+            return;
+        }
+
+        // Ajouter un léger décalage pour la position (60px pour laisser de la marge)
+        const offset = 60;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+        // Faire le scroll en douceur
+        window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+        });
+
+        // Attendre que le scroll soit terminé
+        setTimeout(resolve, 400);
+    });
+}
+
+function createMobileTutorialOverlay(step, targetEl) {
+    mobileTutorialOverlay = document.createElement('div');
+    mobileTutorialOverlay.className = 'mobile-tutorial-overlay';
+    Object.assign(mobileTutorialOverlay.style, {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 999999,
+        pointerEvents: 'auto'
+    });
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    const hole = calculateMobileHolePosition(targetEl);
+    mobileTutorialOverlay.innerHTML = createMobileSvgMask(hole);
+
+    const msgBox = createMobileMessageBox(step, hole);
+    mobileTutorialOverlay.appendChild(msgBox);
+
+    setupMobileTutorialEvents();
+
+    document.body.appendChild(mobileTutorialOverlay);
+}
+
+function calculateMobileHolePosition(targetEl) {
+    const padding = 10;
+    const borderRadius = 14;
+    if (!targetEl) {
+        return { x: -1000, y: -1000, width: 0, height: 0, rx: 0 };
+    }
+    const rect = targetEl.getBoundingClientRect();
+    return {
+        x: rect.left - padding,
+        y: rect.top - padding,
+        width: rect.width + 2 * padding,
+        height: rect.height + 2 * padding,
+        rx: borderRadius
+    };
+}
+
+function createMobileSvgMask(hole) {
+    return `
+        <svg width="100%" height="100%" style="position:absolute;top:0;left:0;pointer-events:none;">
+            <defs>
+                <mask id="mobile-spotlight-mask">
+                    <rect x="0" y="0" width="100%" height="100%" fill="white"/>
+                    <rect x="${hole.x}" y="${hole.y}" width="${hole.width}" height="${hole.height}" rx="${hole.rx}" fill="black"/>
+                </mask>
+            </defs>
+            <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.85)" mask="url(#mobile-spotlight-mask)"/>
+        </svg>
+    `;
+}
+
+function createMobileMessageBox(step, hole) {
+    const msgBox = document.createElement('div');
+    msgBox.className = 'mobile-tutorial-message';
+    Object.assign(msgBox.style, {
+        position: 'absolute',
+        maxWidth: '90vw',
+        background: '#222',
+        color: '#fff',
+        padding: '1em 1.2em',
+        borderRadius: '12px',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+        zIndex: 1000000,
+        fontSize: '1em'
+    });
+
+    msgBox.innerHTML = `
+        <div style="margin-bottom:1em;">${step.message}</div>
+        <button id="mobile-tutorial-next-btn" style="background:#ffd600;color:#222;border:none;padding:0.5em 1.2em;border-radius:8px;cursor:pointer;font-weight:bold;">Suivant</button>
+    `;
+
+    const { top, left, right } = calculateMobileMessagePosition(step.placement, hole, msgBox);
+    msgBox.style.top = `${top}px`;
+    msgBox.style.left = `${left}px`;
+    msgBox.style.right = `${right}px`;
+
+    return msgBox;
+}
+
+function calculateMobileMessagePosition(placement, hole, msgBox) {
+    const minMargin = 10;
+    const spacing = 20;
+    const maxBoxWidth = 320;
+
+    // Prend la vraie hauteur de la boîte, ou une valeur de secours
+    const msgBoxRect = msgBox.getBoundingClientRect();
+    const msgBoxHeight = msgBoxRect.height || 110;
+
+    let top, left, right;
+
+    switch (placement) {
+        case 'top':
+            top = hole.y - msgBoxHeight - spacing;
+            break;
+        case 'bottom':
+            top = hole.y + hole.height + spacing;
+            break;
+        case 'left':
+            top = hole.y + hole.height / 2 - msgBoxHeight / 2;
+            left = hole.x - maxBoxWidth - minMargin;
+            break;
+        case 'right':
+            top = hole.y + hole.height / 2 - msgBoxHeight / 2;
+            left = hole.x + hole.width + minMargin;
+            break;
+        default:
+            top = window.innerHeight / 2 - msgBoxHeight / 2;
+            left = window.innerWidth / 2 - maxBoxWidth / 2;
+    }
+
+    if (placement === 'top' || placement === 'bottom') {
+        left = hole.x + hole.width / 2 - maxBoxWidth / 2;
+    }
+
+    // Empêche le débordement horizontal
+    left = Math.max(minMargin, Math.min(left || 0, window.innerWidth - maxBoxWidth - minMargin));
+    right = Math.max(minMargin, window.innerWidth - (left + maxBoxWidth));
+
+    // Empêche le débordement haut
+    if (placement === 'top') {
+        top = Math.min(top, hole.y - msgBoxHeight - spacing);
+    }
+
+    // Clamp final du top
+    top = Math.max(minMargin, Math.min(top, window.innerHeight - msgBoxHeight - minMargin));
+
+    return { top, left, right };
+}
+
+
+function setupMobileTutorialEvents() {
+    mobileTutorialOverlay.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+    const nextBtn = mobileTutorialOverlay.querySelector('#mobile-tutorial-next-btn');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            mobileTutorialStep++;
+            showMobileTutorialStep();
+        });
+    }
+}
+
+function removeMobileTutorialOverlay() {
+    document.body.style.overflow = 'visible';
+    document.documentElement.style.overflow = 'visible';
+    if (mobileTutorialOverlay) {
+        mobileTutorialOverlay.remove();
+        mobileTutorialOverlay = null;
+    }
+}
+
+// Lancement automatique du tutoriel mobile si pas déjà fait
+const mobileTutorialObserver = new MutationObserver((mutationsList) => {
+    for (const mutation of mutationsList) {
+        if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeType === 1 && node.id === 'main-screen-phone' && !getCookie('tutoMobile')) {
+                    setTimeout(() => {
+                        if (!getCookie('tutoMobile')) startMobileTutorial();
+                    }, 1000);
+                }
+            });
+        }
+    }
+});
+
+if (document.body) {
+    mobileTutorialObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+window.startMobileTutorial = startMobileTutorial;
+
 
 // Fonction pour désactiver les contrôles
 function disableControls() {

@@ -236,7 +236,7 @@ body {
   flex-direction: column;
 }
 
-.control-row {
+.control-row, .control-row-mobile {
   display: flex;
   flex-wrap: wrap; /* ← C'est ça qui permet le retour à la ligne */
   align-items: center;
@@ -1201,6 +1201,34 @@ body::-webkit-scrollbar,
     display: flex;
     justify-content: left;
     width: 100%;
+  }
+
+  .tutorial-overlay {
+    background-color: rgba(0,0,0,0.85);
+  }
+    
+  .tutorial-message {
+    max-width: 280px;
+    padding: 12px 14px;
+    font-size: 14px;
+    margin: 0 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+  }
+  
+  .tutorial-message button {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  
+  @keyframes fadeInUp {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px) scale(0.98);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+    }
   }
 
 }
