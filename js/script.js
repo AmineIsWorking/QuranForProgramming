@@ -1934,7 +1934,7 @@ function initCarouselLogic() {
 
     setTimeout(() => {
         startAuto();
-    }, 5000);
+    }, 10000);
 
     const pauseOnUserInteraction = () => {
         pauseAuto();
@@ -2626,12 +2626,6 @@ function getCookie(name) {
 function updateSheikhHighlights() {
     const favSheikhs = getCookie('favSheikhs');
     const oKCookie = getCookie('oKCookie');
-
-    if (!oKCookie) {
-        showCookieAlert();
-        return;
-    }
-
     const favList = favSheikhs ? JSON.parse(favSheikhs) : [];
 
     // 1. Mettre à jour le menu
@@ -2639,6 +2633,11 @@ function updateSheikhHighlights() {
         const sheikhName = item.textContent;
         item.classList.toggle('highlight', favList.includes(sheikhName));
     });
+
+    if (!oKCookie) {
+        showCookieAlert();
+        return;
+    }
 }
 
 function showCookieAlert() {
@@ -2659,7 +2658,6 @@ function showCookieAlert() {
     document.getElementById('ack-cookies').addEventListener('click', () => {
         setCookie('oKCookie', 'whatever');
         alert.remove();
-        updateSheikhHighlights(); // met à jour les highlights après acceptation
     });
 }
 
