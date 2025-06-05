@@ -39,7 +39,12 @@ const tutorialConfig = [
         placement: "right"
     },
     {
-        target: "#menuR",
+        target: '.menuR-container',
+        message: "Ce menu vous permet de changer de sheikh à tout moment. Cliquez sur un nom pour découvrir son style de récitation.",
+        placement: "bottom"
+    },
+    {
+        target: '#menuR',
         message: "Ce menu vous permet de changer de sheikh à tout moment. Cliquez sur un nom pour découvrir son style de récitation.",
         placement: "bottom"
     },
@@ -77,6 +82,23 @@ function startTutorial() {
 
 function showTutorialStep() {
     removeTutorialOverlay();
+
+    if (tutorialStep < tutorialConfig.length) {
+        const step = tutorialConfig[tutorialStep];
+
+        // Si le step est .menuR-container mais qu'il n'existe pas, passer au suivant (#menuR)
+        if (step.target === '.menuR-container' && !document.querySelector('.menuR-container')) {
+            tutorialStep++;
+            showTutorialStep();
+            return;
+        }
+        // Si le step est #menuR mais que .menuR-container existe déjà, sauter ce step
+        if (step.target === '#menuR' && document.querySelector('.menuR-container')) {
+            tutorialStep++;
+            showTutorialStep();
+            return;
+        }
+    }
 
     if (tutorialStep >= tutorialConfig.length) {
         // Restaurer l'affichage original du bouton
@@ -573,6 +595,117 @@ if (document.body) {
 
 window.startMobileTutorial = startMobileTutorial;
 
+function textRevealAnimation(element, { duration = 1000, delay = 0, reverse = false, absolute = false, pointerEvents = false }) {
+    const textNodes = getTextNodes(element); // Récupère tous les nœuds texte dans l'élément
+    const lengths = textNodes.map(node => node.nodeValue.length);
+    const originalText = textNodes.map(node => node.nodeValue).join("");
+    const placeholder = originalText.split(" ").map(word => {
+        let placeholder = "";
+        for (let i = 0; i < word.length; i++) placeholder += " "; // Espaces insécables
+        return placeholder;
+    }).join(" ");
+
+    let currentText = placeholder;
+    const maxRandomChars = reverse ? originalText.length * 0.25 : originalText.length * 1.5;
+    const randomnessFactor = reverse ? 0.1 : 0.8;
+    const direction = reverse ? -1 : 1;
+
+    if (absolute) {
+        element.style.position = "absolute";
+        element.style.top = "0";
+    }
+    if (!pointerEvents) {
+        element.style.pointerEvents = "none";
+    }
+
+    return {
+        duration,
+        delay,
+        tick: (progress) => {
+        progress = -(Math.cos(Math.PI * progress) - 1) / 2; // Courbe de progression
+        progress = Math.pow(progress, 2); // Accélération
+        if (reverse) progress = 1 - progress;
+
+        let revealedLength = Math.floor(originalText.length * Math.abs(progress * direction));
+        let randomLength = Math.floor(2 * (0.5 - Math.abs(progress - 0.5)) * maxRandomChars);
+
+        let newText = reverse 
+            ? originalText.slice(0, Math.max(revealedLength - 1 - randomLength, 0))
+            : originalText.slice(0, revealedLength);
+
+        if (Math.random() < 0.5 && progress < 1 && progress != 0) {
+            for (let i = 0; i < 20; i++) {
+            const pos = revealedLength + Math.floor((1 - Math.random()) * randomLength * (i / 20));
+            if (currentText[pos] != " ") {
+                currentText = replaceCharAt(currentText, pos, getRandomChar(reverse));
+            }
+            }
+        }
+
+        if (reverse) {
+            newText += currentText.slice(Math.max(revealedLength - 1 - randomLength, 0), Math.max(revealedLength - 1, 0));
+            newText += originalText.slice(Math.max(revealedLength - 1, 0));
+        } else {
+            newText += currentText.slice(revealedLength, revealedLength + randomLength);
+            newText += placeholder.slice(revealedLength + randomLength);
+        }
+
+        let offset = 0;
+        for (let i = 0; i < textNodes.length; i++) {
+            textNodes[i].nodeValue = newText.slice(offset, offset + lengths[i]);
+            offset += lengths[i];
+        }
+        }
+    };
+}
+
+function getTextNodes(element) {
+    const textNodes = [];
+    if (element.childNodes.length > 0) {
+        element.childNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== "") {
+            node.nodeValue = node.nodeValue.replace(/(\n|\r|\t)/gm, "");
+            textNodes.push(node);
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            textNodes.push(...getTextNodes(node));
+        }
+        });
+    }
+    return textNodes;
+}
+
+function replaceCharAt(str, index, char) {
+    return str.substring(0, index) + char + str.substring(index + 1);
+}
+
+function getRandomChar(reverse) {
+    const specialChars = "—~±§|[].+$^@*()•x%!?#";
+    return reverse 
+        ? "x".charAt(Math.floor(Math.random() * "x".length))
+        : specialChars.charAt(Math.floor(Math.random() * specialChars.length));
+}
+
+function applyTextReveal(element, duration = 1000, delay = 0, reverse = false) {
+    if (!element) return;
+    
+    const animation = textRevealAnimation(element, {
+        duration,
+        delay,
+        reverse,
+        absolute: false,
+        pointerEvents: true
+    });
+    
+    const start = performance.now();
+    requestAnimationFrame(function step(timestamp) {
+        const elapsed = timestamp - start;
+        const progress = Math.min(elapsed / animation.duration, 1);
+        animation.tick(progress);
+        if (progress < 1) {
+            requestAnimationFrame(step);
+        }
+    });
+}
 
 // Fonction pour désactiver les contrôles
 function disableControls() {
@@ -774,7 +907,7 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                         return;
                     }
 
-                    const isMobile = window.matchMedia('(max-width: 1290px)').matches;
+                    const isMobile = window.matchMedia('(max-width: 600px)').matches;
                     const container = isMobile
                         ? document.getElementById('sourate-container-mobile')
                         : document.querySelector('.sourate-container');
@@ -786,7 +919,7 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                             container.style.opacity = '0';
                             setTimeout(() => {
                                 loadAndPlaySourate(sheikh, currentSourateIndex + 1);
-                                loadSurahText(currentSourateIndex + 1).then(() => {
+                                loadSurahText(currentSourateIndex).then(() => {
                                     container.style.opacity = '1';
                                 });
                             }, 300);
@@ -925,7 +1058,7 @@ function highlightCurrentVerse() {
 
 // Fonctions pour jouer suivant/précédent (version optimisée)
 function playNextSourate() {
-    const isMobile = window.matchMedia('(max-width: 1290px)').matches;
+    const isMobile = window.matchMedia('(max-width: 600px)').matches;
     const container = isMobile
         ? document.getElementById('sourate-container-mobile')
         : document.querySelector('.sourate-container');
@@ -957,7 +1090,7 @@ function playNextSourate() {
 }
 
 function playPrevSourate() {
-    const isMobile = window.matchMedia('(max-width: 1290px)').matches;
+    const isMobile = window.matchMedia('(max-width: 600px)').matches;
     const container = isMobile
         ? document.getElementById('sourate-container-mobile')
         : document.querySelector('.sourate-container');
@@ -991,7 +1124,7 @@ function loadSurahText(index) {
         const surahNumber = String(index + 1);
 
         // Détection automatique : moins de 768px = mobile
-        const isMobile = window.matchMedia('(max-width: 1290px)').matches;
+        const isMobile = window.matchMedia('(max-width: 600px)').matches;
         
         loadJSON(`./js/surah/${surahNumber}.json`)
             .then(data => {
@@ -1005,36 +1138,6 @@ function loadSurahText(index) {
             });
     });
 }
-
-
-// === Hacker effect pour les textes (conservé uniquement pour chargement initial) ===
-function hackerEffect(element, originalText, speed = 20, step = 3) {
-    const chars = "!<>-_\\/[]{}—=+*^?#________";
-    let revealed = 0;
-
-    const interval = setInterval(() => {
-        let output = "";
-
-        for (let i = 0; i < originalText.length; i++) {
-            if (i < revealed) {
-                output += originalText[i];
-            } else if (originalText[i] === " ") {
-                output += " ";
-            } else {
-                output += chars[Math.floor(Math.random() * chars.length)];
-            }
-        }
-
-        element.textContent = output;
-        revealed += step;
-
-        if (revealed >= originalText.length) {
-            clearInterval(interval);
-            element.textContent = originalText;
-        }
-    }, speed);
-}
-
 
 function formatDuration(durationMs) {
     const seconds = Math.floor((durationMs / 1000) % 60);
@@ -1333,7 +1436,6 @@ function returnToCarousel() {
             }
         }
 
-        // Nettoyage du clone
         // Nettoyage du clone
         setTimeout(() => {
             imgClone.remove();
@@ -1716,12 +1818,27 @@ window.onload = async () => {
     }, 8500);
 
   setTimeout(() => {
-    const newText = "Select your Sheikh to start:";
-    welcomeMessage.textContent = "";
+    welcomeMessage.textContent = "Select your Sheikh to start:";
     welcomeMessage.style.display = 'block';
-    hackerEffect(welcomeMessage, newText);
+    
+    const animation = textRevealAnimation(welcomeMessage, {
+        duration: 2000,
+        delay: 0,
+        reverse: false
+    });
+    
+    const start = performance.now();
+    requestAnimationFrame(function step(timestamp) {
+        const elapsed = timestamp - start;
+        const progress = Math.min(elapsed / animation.duration, 1);
+        animation.tick(progress);
+        if (progress < 1) {
+            requestAnimationFrame(step);
+        }
+    });
+    
     welcomeMessage.classList.add('up');
-  }, 8500);
+}, 8500);
 
   const carouselList = document.getElementById('sheikh-carousel');
   const welcomeScreen = document.querySelector('.welcome-screen');
@@ -2006,7 +2123,7 @@ async function displaySheikhStats(sheikh) {  // On passe l'objet sheikh complet
     statsWorker = new Worker('./js/statsWorker.js');
     
     // Afficher un indicateur de chargement
-    const isMobile = window.matchMedia('(max-width: 1290px)').matches;
+    const isMobile = window.matchMedia('(max-width: 600px)').matches;
     if (isMobile) {
         document.getElementById('heures-mobile').textContent = '// ...';
         document.getElementById('minutes-mobile').textContent = '// ...';
@@ -2037,7 +2154,7 @@ async function displaySheikhStats(sheikh) {  // On passe l'objet sheikh complet
 }
 
 function updateStatsUI(stats) {
-    const isMobile = window.matchMedia('(max-width: 1290px)').matches;
+    const isMobile = window.matchMedia('(max-width: 600px)').matches;
     if (isMobile) {
         document.getElementById('heures-mobile').textContent = '// ' + stats.hours;
         document.getElementById('minutes-mobile').textContent = '// ' + stats.minutes;
@@ -2097,7 +2214,6 @@ window.initializeSheikh = function (index) {
 
     document.body.appendChild(imgClone);
 
-    
     // Cacher temporairement menuL et menuR
     const menuL = document.querySelector('.menuL');
     const menuR = document.querySelector('.menuR');
@@ -2155,6 +2271,57 @@ window.initializeSheikh = function (index) {
             imgClone.remove();
             newOverlay.style.transition = 'opacity 0.4s ease';
             newOverlay.style.opacity = '1';
+
+            // === Animation textuelle ===
+            // Desktop
+            if (window.innerWidth > 768) {
+                const sheikhName = newOverlay.querySelector('.sheikh-name');
+                const sheikhBio = newOverlay.querySelector('.sheikh-bio');
+                const mediaInfo = newOverlay.querySelector('.media-info');
+                const souratesContainer = newOverlay.querySelector('.souratesContainer');
+                if (sheikhName) applyTextReveal(sheikhName, 800, 0);
+                if (sheikhBio) applyTextReveal(sheikhBio, 1200, 200);
+                if (mediaInfo) applyTextReveal(mediaInfo, 800, 400);
+                if (souratesContainer) applyTextReveal(souratesContainer, 1000, 600);
+
+                // Animer les éléments du menuR
+                document.querySelectorAll('.menu-item').forEach((item, i) => {
+                    applyTextReveal(item, 600, 100 * i);
+                });
+
+                // Animer les éléments du menuL
+                const codestyle = document.querySelector('.code-style');
+                const audiocontrol = document.querySelector('.control-row');
+                const sheikhstats = document.querySelector('.sheikh-stats');
+                if (codestyle) applyTextReveal(codestyle, 600, 100);
+                if (audiocontrol) applyTextReveal(audiocontrol, 600, 200);
+                if (sheikhstats) applyTextReveal(sheikhstats, 600, 300);
+            } else {
+                // Mobile
+                const sheikhName = newOverlay.querySelector('.sheikh-name-mobile');
+                const sheikhBio = newOverlay.querySelector('.sheikh-bio-mobile');
+                const mediaInfo = newOverlay.querySelector('.media-info-mobile');
+                const souratesContainer = newOverlay.querySelector('.souratesContainer');
+                const codestylemobile = newOverlay.querySelector('.code-style');
+                if (sheikhName) applyTextReveal(sheikhName, 800, 0);
+                if (sheikhBio) applyTextReveal(sheikhBio, 1200, 200);
+                if (mediaInfo) applyTextReveal(mediaInfo, 800, 400);
+                if (souratesContainer) applyTextReveal(souratesContainer, 1000, 600);
+                if (codestylemobile) applyTextReveal(codestylemobile, 600, 100);
+
+                // Animer les éléments du menuR
+                document.querySelectorAll('.menu-item').forEach((item, i) => {
+                    applyTextReveal(item, 600, 100 * i);
+                });
+
+                // Animer les éléments du menuL
+                const codestyle = document.querySelector('.code-style');
+                const audiocontrol = document.querySelector('.control-row-mobile');
+                const sheikhstats = document.querySelector('.sheikh-stats-mobile');
+                if (codestyle) applyTextReveal(codestyle, 600, 100);
+                if (audiocontrol) applyTextReveal(audiocontrol, 600, 200);
+                if (sheikhstats) applyTextReveal(sheikhstats, 600, 300);
+            }
 
         }, 800);
 
@@ -2248,7 +2415,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 isFirstPlay = true;
                 isPlayAll = true;
                 
-                loadAndPlaySourate(window.matchMedia('(max-width: 1290px)').matches ?
+                loadAndPlaySourate(window.matchMedia('(max-width: 600px)').matches ?
                     sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : 
                     sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent), 0); 
                 return;
@@ -2648,7 +2815,7 @@ function showCookieAlert() {
 
     const menuL = document.querySelector('.menuL');
     alert.innerHTML = `
-        <div style="margin-top: 1em; color: #dddd25;">
+        <div style="margin-top: 1em; color: #dddd25; margin-bottom: 2em;">
             Do you know cookies are a thing?<br>
             <span id="ack-cookies" style="cursor: pointer;">[yes I'm aware]</span>
         </div>
@@ -2687,3 +2854,54 @@ function showMobileCookieAlert(container) {
         alert.remove();
     });
 }
+
+// === Fusion menuR/menuL pour tablette ===
+function handleTabletMenus() {
+    const menuL = document.querySelector('.menuL');
+    const menuR = document.querySelector('.menuR');
+    if (!menuL || !menuR) return;
+
+    // Détecte la largeur tablette (ex: 768px à 1024px)
+    const isTablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+    
+    // Crée un conteneur pour le menuR si il n'existe pas
+    let menuRContainer = menuL.querySelector('.menuR-container');
+    if (!menuRContainer && isTablet) {
+        menuRContainer = document.createElement('div');
+        menuRContainer.className = 'menuR-container';
+        menuL.appendChild(menuRContainer);
+    }
+
+    if (isTablet) {
+        // Déplace le contenu de menuR dans le conteneur
+        while (menuR.firstChild) {
+            menuRContainer.appendChild(menuR.firstChild);
+        }
+        menuR.style.display = 'none'; // Cache le menuR original
+        
+        // Ajoute des classes pour le style tablette
+        menuL.classList.add('tablet-mode');
+    } else {
+        // Mode desktop - restaure le menuR
+        if (menuRContainer) {
+            while (menuRContainer.firstChild) {
+                menuR.appendChild(menuRContainer.firstChild);
+            }
+            menuRContainer.remove();
+            menuR.classList.remove('tablet-menuR');
+        }
+        menuR.style.display = 'block'; // Réaffiche le menuR
+        menuL.classList.remove('tablet-mode');
+    }
+}
+
+// Gestion des événements avec debounce pour performance
+let resizeTimer;
+function debouncedHandleTabletMenus() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(handleTabletMenus, 100);
+}
+
+window.addEventListener('resize', debouncedHandleTabletMenus);
+window.addEventListener('DOMContentLoaded', handleTabletMenus);
+document.addEventListener('astro:after-swap', handleTabletMenus); // Pour Astro

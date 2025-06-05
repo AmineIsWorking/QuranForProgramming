@@ -74,8 +74,8 @@ body {
     align-items: center;
     height: 100vh;
     position: relative;
-    padding-left: 350px; /* Largeur de menuL */
-    padding-right: 300px; /* Largeur de menuR */
+    padding-left: min(350px, 25%);
+    padding-right: min(300px, 20%);
     overflow-x: hidden; /* Empêche le débordement horizontal */
 }
 
@@ -199,8 +199,8 @@ body {
 
 #sourate-container {
     position: fixed;
-    left: 350px; 
-    right: 300px;
+    left: min(350px, 25%); 
+    right: min(300px, 20%);
     width: auto; 
     padding-left: 20px; 
     top: 0;
@@ -212,7 +212,7 @@ body {
     position: fixed;
     top: 0px;
     right: 0px;
-    width: 300px;
+    width: min(300px, 20%);
     padding: 60px 20px 20px 20px;
     box-sizing: border-box;
 }
@@ -222,10 +222,10 @@ body {
   left: 0;
   top: 40px;
   height: 100%;
-  width: 350px;
+  width: min(350px, 25%);
   margin-left: 30px;
   padding: 10px;
-  font-size: 16px;
+  font-size: clamp(12px, 1.2vw, 16px); 
   display: flex;
   flex-direction: column;
   max-height: 700px;
@@ -333,7 +333,7 @@ body {
   display: flex;
   flex-direction: column;
   font-family: monospace;
-  font-size: 16px;
+  font-size: clamp(13px, 1.2vw, 16px);
   color: #333;
   margin: 20px 0;
   margin-top: 10px;
@@ -361,6 +361,9 @@ body {
     border-bottom: 1px solid transparent;
     display: inline-block; 
     white-space: nowrap; 
+    transition: all 0.3s ease;
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .menu-item.active {
@@ -428,8 +431,8 @@ audio {
 
 .sheikh-info {
     position: fixed;
-    left: 390px;
-    right: 300px;
+    left: min(390px, calc(25% + 40px));
+    right: min(300px, 20%);
     width: auto; 
     height: 100vh;
     padding: 20px;
@@ -935,7 +938,7 @@ body::-webkit-scrollbar,
     to { opacity: 1; transform: translateY(0);}
 }
 
-@media screen and (max-width: 600px) {
+@media screen and (max-width: 770px) {
 
   html, body {
     width: 100vw;          
@@ -1231,4 +1234,56 @@ body::-webkit-scrollbar,
     }
   }
 
+}
+
+.menuL.tablet-mode {
+  position: fixed;
+  left: 0;
+  top: 40px;
+  height: 100%;
+  width: min(350px, 25%);
+  margin-left: 30px;
+  padding: 10px;
+  font-size: clamp(12px, 1.2vw, 16px); 
+  display: flex;
+  flex-direction: column;
+  max-height: 700px;
+  overflow-y: auto;
+}
+
+@media (max-width: 1024px) and (min-width: 768px) {
+    body {
+        padding-left: 300px !important;
+        padding-right: 0 !important;
+    }
+    .menuR {
+        display: none;
+    }
+    .sheikh-info, #sourate-container {
+        left: 300px;
+        right: 0;
+    }
+    .sheikh-info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .sourate-list {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+        max-width: 800px; /* Limite la largeur pour un meilleur affichage */
+        margin: 0 auto;
+        padding: 0;
+    }
+    
+    .sourate-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 30px; /* Largeur minimale pour chaque item */
+        text-align: center;
+    }
 }
