@@ -41,7 +41,7 @@ const tutorialConfig = [
     {
         target: '.menuR-container',
         message: "Ce menu vous permet de changer de sheikh à tout moment. Cliquez sur un nom pour découvrir son style de récitation.",
-        placement: "bottom"
+        placement: "top"
     },
     {
         target: '#menuR',
