@@ -2,6 +2,7 @@
 let isFirstPlay = true;
 let isInitialLoad = true;
 let controlsInitialized = false;
+let isFirstInteraction = true;
 let statsWorker = null;
 let currentAudio = null;
 let currentSourateIndex = -1;
@@ -932,7 +933,7 @@ function loadAndPlaySourate(sheikh, sourateIndex) {
                             container.style.opacity = '0';
                             setTimeout(() => {
                                 loadAndPlaySourate(sheikh, currentSourateIndex - 1);
-                                loadSurahText(currentSourateIndex - 1).then(() => {
+                                loadSurahText(currentSourateIndex).then(() => {
                                     container.style.opacity = '1';
                                 });
                             }, 300);
@@ -1310,6 +1311,7 @@ function createOverlay(data) {
         `;
         item.onclick = () => {
             isInitialLoad = false;
+            isFirstInteraction = false;
             if (!controlsInitialized) {
                 enableControls();
             }
@@ -1624,8 +1626,13 @@ function createOverlayMobile(data) {
             <div class="sourate-arabic">${sourate.arabicname}</div>
             `;
             item.onclick = () => {
-            const sheikh = data;
-            loadAndPlaySourate(sheikh, sourates.indexOf(sourate));
+                isInitialLoad = false;
+                isFirstInteraction = false;
+                if (!controlsInitialized) {
+                    enableControls();
+                }
+                const sheikh = data;
+                loadAndPlaySourate(sheikh, sourates.indexOf(sourate));
             };
         
             list.appendChild(item);
@@ -2262,7 +2269,7 @@ window.initializeSheikh = function (index) {
         setTimeout(() => {
             // Afficher doucement menuL et menuR
             updateNavigationButtons();
-            disableControls();
+            if (isFirstInteraction) disableControls();
             menuL.style.transition = 'opacity 0.4s ease';
             menuR.style.transition = 'opacity 0.4s ease';
             menuL.style.opacity = '1';
@@ -2414,6 +2421,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 isInitialLoad = false;
                 isFirstPlay = true;
                 isPlayAll = true;
+                isFirstInteraction = false;
                 
                 loadAndPlaySourate(window.matchMedia('(max-width: 600px)').matches ?
                     sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : 
@@ -2569,32 +2577,32 @@ const sheikhs = [
     {
         name: "Mishari Rashid al-`Afasy",
         filename: "Mishari_Rashid_al_Afasy.json",
-        photo: "./assets/images/Mishary-Rashid-Alafasy.jpeg",
-        bio: "Mishary Rashid Alafasy, du Koweït, est mondialement reconnu pour sa voix apaisante et sa récitation émotive du Coran. Il a fondé la première chaîne de télévision entièrement dédiée à la récitation du Coran. Il est aussi le premier réciteur à avoir enregistré le Coran en entier dans les dix lectures (qira'at).",
+        photo: "./assets/images/Mishary-Rashid-Alafasy.png",
+        bio: "Mishary Rashid Alafasy ou Mishary ben Rashid Al-Afasy ou encore Mishary Rashid Ghareeb Mohammed Rashed Al-Afasy, alias Abou Nora est un imam et réciteur koweitien international du coran. Il est né le 5 septembre 1976 au Koweit (le 11 ramadan 1396 H).   Adolescent, Mishary Rashid Al-Afasy a étudié le coran dans le Collège Holy Coran et a fait des études islamiques à l'Université islamique de Médine (Arabie Saoudite).  Il a pu éblouir un grand nombre de grands savants après sa lecture du coran devant le cheikh Ahmed Abdulaziz Al-Zaiat, le cheikh Ibrahim Ali Shahata Al-Samanodei, et le cheikh Abdurarea Radwan.  Actuellement, Mishary Rashid Al-Afasy est l'imam de Masjid Al-Kabir (grande mosquée) à Koweit. Il dirige les prières de Tarawih chaque Ramadan dans cette mosquée.",
     },
     {
         name: "Mahmoud Khalil Al-Husary",
         filename: "Mahmoud_Khalil_Al_Husary.json",
-        photo: "./assets/images/Mahmoud-Khalil-Al-Husary.jpeg",
-        bio: "Mahmoud Khalil Al-Husary, un maître égyptien du tajwid, est connu pour sa récitation claire et méthodique. Il a été le premier réciteur à enregistrer le Coran complet en plusieurs styles de récitation, ce qui a grandement contribué à l'apprentissage du Coran dans le monde entier.",
+        photo: "./assets/images/Mahmoud-Khalil-Al-Husary.png",
+        bio: "Mahmoud Khalil AL Hussary est un grand réciteur égyptien du Coran, il est né le 17 septembre 1917 ( premier Zu AL Hijja 1335 de l'hégire) dans le village de Shubra Al-Namla à Tanta à la préfecture du Gharbia.   Avant la naissance du Sheikh AL Hussary, son père a quitté la préfecture du Fayoum vers le village de Shubra El Namla où Mahmoud Khalil Al Hussary a vu le jour. Son père l'a inscrit à l'école coranique à l'âge de 4 ans afin d'apprendre le Coran. A l'âge de 8 ans Cheikh Al Hussary a appris le Coran, puis a intégré l'Institut religieux de Tanta 4 ans plus tard.  Cheikh Mahmoud Khalil Al Husary a perfectionné la lecture du Coran dans les dix lectures après ses études à Al Azhar. Cheikh AL Hussary a commencé à réciter le Coran dans la mosquée de son village et en 1944 il a rejoint la radio égyptienne après avoir présenté une demande et passé un concours de lecture. Sa première récitation a été émise sur les ondes en direct le 16 novembre 1944. La radio égyptienne a gardé la diffusion exclusive de sa récitation du Coran durant 10 ans.  Il a été nommé cheikh du Maqra'a Sidi Abdul Muta'al à Tanta, puis il est devenu Muazin de la mosquée Sidi Hamza le 7 août 1948, avant de devenir le réciteur de la mosquée le 10 octobre de la même année.  Cheikh Mahmoud Khalil Al Hussary a été désigné par un arrêté ministériel comme superviseur des Maqari' de la préfecture de Gharbiya.",
     },
     {
         name: "Sa'ud ash-Shuraim",
         filename: "Saud_ash_Shuraim.json",
-        photo: "./assets/images/Saud-ash-Shuraim.jpeg",
-        bio: "Saad Al-Ghamdi a mémorisé le Coran à l'âge de 22 ans et a ensuite étudié les dix lectures (al-qira'at al-‘ashr). Son enregistrement complet du Coran est l’un des plus utilisés dans les écoles coraniques du monde pour son style clair et parfait pour l’apprentissage.",
+        photo: "./assets/images/Saud-ash-Shuraim.png",
+        bio: "Saoud Shuraim est l'un des plus grands et célèbres récitateurs du saint coran, il est né en 1965 (1386 H) à Ryad (Arabie saoudite).   Diplomé de l'Université d'Al Imam Mohamed Ben Saoud (Riyad), Saoud Shuraim a décroché un diplôme dans Al Aqida wa Al Madahib Al Moassira en 1989 (1409 H) et a obtenu le diplôme du magistrat de l'institut supérieur de la magistrature en 1993 (1413 H).  Saoud Shuraim a appris la récitation du coran sous l'égide de grands enseignants comme : Abderrahmane El Berrak, Okail Ben Abdallah, Abdallah Al Jabrayn, Abdelaziz Errajhi, Cheikh Abdelaziz Ben Baz, Fahd Al Houmain, Saleh Ibn Fawzane…",
     },
     {
         name: "AbdulBaset AbdulSamad",
         filename: "AbdulBaset_AbdulSamad.json",
-        photo: "./assets/images/Abdul-Basit-Abdus-Samad.jpeg",
-        bio: "Abdul Basit Abdus Samad, légende égyptienne du tajwid, est le seul réciteur à avoir conquis le cœur de millions dans le monde entier sans aucun média moderne à l’époque. Il a récité le Coran à l’ONU en 1970, un événement marquant où plusieurs non-musulmans furent émus aux larmes par sa récitation.",
+        photo: "./assets/images/Abdul-Basit-Abdus-Samad.png",
+        bio: "Cheikh Abdelbasset bin Mohammed bin Salim bin Abdul Samad est un grand réciteur du Coran, il est né en 1927 dans le village de Alemraazza- Armant-Qena dans le sud de l'Egypte. Son père le Cheikh Mohammed Abdessamad fut un grand réciteur du coran dans son village.   Abdelbasset Abdessamad a appris le Coran à travers le Cheikh de l'école coranique du village, le Cheikh Mohammed El Amir et a étudié les lectures du Cheikh Mohammed Salim Hamadah. Il a accompli l'apprentissage du Coran à l'âge de 10 ans.  Cheikh Abdelbasset devint un grand réciteur dans le Sud de l'Egypte ( Assai'd), mais l'évènement qui bouscula sa vie fut sa visite en 1950 au mausolée du Sayida Zineb à l'occasion des festivités qui coïncidaient avec sa naissance et qui furent organisées par les grands cheikhs tels que Abdelfattah Che3cha3i, Moustafa Isma'il , Abdeladim Zaher, Abu L3inin Sh3esha3 et d'autres... Les organisateurs de ces festivités lui demandèrent alors de réciter quelques versets du Coran pendant une dizaine de minutes, le Cheikh lut Sourate Al Ahzab et attira l'attention du public qui demandait au cheikh de continuer sa récitation, une récitation qui a finalement duré une heure et demie.  En 1951, Cheikh Abdelbasset Abdessamad entre à la radio égyptienne, lors de sa première récitation il a lu Sourat Fatir. Une année plus tard il a été désigné comme réciteur de la mosquée Imam Shafe'i, puis de la mosquée Imam EL Hussein en 1985 succédant au Cheikh Mahmoud Ali El Banna.",
     },
     {
         name: "Abu Bakr al-Shatri",
         filename: "Abu_Bakr_al_Shatri.json",
-        photo: "./assets/images/Abu-Bakr-al-Shatri.webp",
-        bio: "Abu Bakr al-Shatri, connu pour sa récitation douce et mélodieuse, est un réciteur saoudien très apprécié. Il a participé à de nombreux événements islamiques internationaux et est souvent invité à diriger les prières dans différentes mosquées à travers le monde.",
+        photo: "./assets/images/Abu-Bakr-al-Shatri.png",
+        bio: "Abu Bakr Al Shatri de son nom complet Abu Bakr Ibn mohamed Al Shatriest est un réciteur et imam saoudien. Il est né en 1970 à Jedda.  Ayant grandi à Jedda, Abu Bakr Al Shatri a obtenu une licence dans le saint coran sous l'égide de cheikh 'Aymane Rochdi Suwaid' en 1416 H puis le master de comptabilité en 1420 H.   Abu Bakr Al Shatri a été l'imam de plusieurs mosquées, notamment : Al Rajihi, Said Ibn Jubair (à Kandara), abd Allatif Jamil, Attakwa (Al Rawda), AChouiâibi (Assalama). Actuellement, il est imam de la mosquée 'Al Furkane' à hay Ennassim (Jedda).",
     },
     {
         name: "Khalifah Al Tunaiji",
@@ -2605,20 +2613,20 @@ const sheikhs = [
     {
         name: "Hani ar-Rifai",
         filename: "Hani_ar_Rifai.json",
-        photo: "./assets/images/Hani-ar-Rifai.jpeg",
+        photo: "./assets/images/Hani-ar-Rifai.png",
         bio: "Hani ar-Rifai, imam de la mosquée Anani à Jeddah, est célèbre pour ses récitations émouvantes et ses dou’as pleines de ferveur. Sa voix unique a touché le cœur de millions de fidèles à travers le monde.",
     },
     {
         name: "Mohamed Siddiq al-Minshawi",
         filename: "Mohamed_Siddiq_al_Minshawi.json",
         photo: "./assets/images/Mohamed-Siddiq-El-Minshawi.jpeg",
-        bio: "Mohamed Siddiq al-Minshawi, un maître égyptien du tajwid, est connu pour sa récitation profonde et spirituelle. Il est considéré comme l'un des plus grands récitateurs de tous les temps, ayant influencé des générations de musulmans.",
+        bio: "Mohamed Seddik El Menchaoui est un imam né en 1920 dans le village Munsha'a à Sohage (Egypte). Il est l'un des meilleurs réciteurs égyptiens du coran.  Mohamed Seddik El Menchaoui est issu d'une ancienne famille de récitation de versets, son père est le Cheikh Seddik EL Menchaoui et son frère le cheikh Mahmoud El Menchaoui. A l'âge de huit ans, Mohamed Seddik El Menchaoui a terminé l'apprentissage du saint coran.  Connu pour la beauté de sa voix et sa bonne psalmodie, il a réalisé beaucoup d'enregistrements et de récitations du coran dans les mosquées Al Aqsa, le Koweït, la Syrie et la Libye.  De nombreuses stations de radio, chaines de télévision et sites internet diffusent sa récitation coranique.  Mohamed Seddik El Menchaoui a aussi participé à des récitations collectives enregistrées avec les deux recitateurs : Kamel Al Bahtimi et Fouad Al Aroussi.  Mohamed Seddik El Menchaoui s'est marié deux fois, il a eu quatre garçons et deux filles avec la première épouse en plus de cinq garçons et quatre filles avec la seconde femme. En 1968, sa deuxième épouse est morte en pèlerinage.  Mohamed Seddik El Menchaoui a toujours été une cible pour plusieurs ennemis qui ont tenté de le tuer en l'empoisonnant lors d'une soirée de récitation, mais Dieu l'a sauvé de leur complot.  Il est à mentionner qu'il a pu refuser de réciter le saint coran devant le président égyptien 'Abd Annasser'.  Mohamed Seddik El Menchaoui est décédé le vendredi 20 juin 1969 (5 Rabi'e II, 1389 H) suite à la maladie Dawali Al Mariê.",
     },
     {
         name: "Abdur-Rahman as-Sudais",
         filename: "Abdur_Rahman_as_Sudais.json",
-        photo: "./assets/images/Abdur-Rahman_As-Sudais.jpg",
-        bio: "Abdur-Rahman As-Sudais a mémorisé le Coran à l’âge de 12 ans. Il est devenu imam de la Mosquée sacrée de La Mecque à seulement 22 ans. En 2005, il a été nommé 'Personnalité islamique de l’année'. Il a dirigé les prières du tarawih avec des millions de fidèles derrière lui, un record historique en nombre de participants à une prière collective.",
+        photo: "./assets/images/Abdur-Rahman_As-Sudais.png",
+        bio: "Abdul Rahman Al Sudais est le premier imam de la Grande mosquée de la ville islamique, La Mecque. C'est un grand réciteur du saint coran de renommée internationale. D'origine du Clan Anza, Abdul Rahman Al Sudais est né en Arabie Saoudite. Abdul Rahman Al Sudais a pu mémoriser le coran alors qu'il n'avait que 12 ans. Il a décroché son diplôme en 1979 de l'institution scientifique 'Riyad' avec la mention 'Excellent'. En 1983, Abdul Rahman Al Sudais a entamé ses études à l'université où il a obtenu un diplôme de la charia et une maîtrise de la charia à l'université islamique de l'imam Muhammad ben Saud en 1987.",
     }
 ];
 
@@ -2904,4 +2912,4 @@ function debouncedHandleTabletMenus() {
 
 window.addEventListener('resize', debouncedHandleTabletMenus);
 window.addEventListener('DOMContentLoaded', handleTabletMenus);
-document.addEventListener('astro:after-swap', handleTabletMenus); // Pour Astro
+document.addEventListener('astro:after-swap', handleTabletMenus);
