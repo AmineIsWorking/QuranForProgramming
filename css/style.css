@@ -202,7 +202,7 @@ body {
     left: min(350px, 25%); 
     right: min(300px, 20%);
     width: auto; 
-    padding-left: 20px; 
+    padding-left: 70px; 
     top: 0;
     height: 100vh;
     overflow-y: auto;
@@ -813,15 +813,14 @@ audio {
 
 .surah-text-container {
   width: 100%;
-  max-width: 730px;
   max-height: calc(100vh - 120px);
   overflow-y: auto;
   padding: 20px 0;
   font-family: 'Quran';
   text-align: right;
   direction: rtl;
+  margin: 1px;
 }
-
 
 
 .verse {
@@ -863,13 +862,8 @@ body::-webkit-scrollbar,
 }
 
 .current-segment {
-    background-color: rgba(200, 200, 200, 0.5);
-    border-radius: 2px;
-    padding: 0 1px;
-}
-
-.current-verse {
     background-color: rgba(200, 200, 200, 0.3);
+    border-radius: 2px;
 }
 
 .highlight {
@@ -936,6 +930,74 @@ body::-webkit-scrollbar,
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(30px);}
     to { opacity: 1; transform: translateY(0);}
+}
+
+#playlist.active {
+    background-color: #ffd600;
+    color: #222;
+}
+
+.add-to-playlist {
+    transition: all 0.3s ease;
+}
+
+.add-to-playlist:hover {
+    transform: scale(1.2);
+}
+
+.custom-select.compact {
+    flex: 1;
+    padding: 6px 12px;
+    border-radius: 12px;
+    border: 1px solid #494d59;
+    background-color: #333740;
+    color: #b1b8ca;
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.3s ease;
+    height: 36px;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='%23b1b8ca' d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+    width: 10%;
+}
+
+.custom-select.compact:focus {
+    border: 1px solid #2c62f6;
+    box-shadow: 0 0 0 2px rgba(44, 98, 246, 0.3);
+    color: #ffffff;
+}
+
+.custom-button.compact {
+    background: #ffd600;
+    color: #222;
+    border: none;
+    padding: 0 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.9rem;
+    height: 36px;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    min-width: 80px;
+}
+
+.custom-button.compact:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.playlist-tab.active {
+    background: #ffd600 !important;
+    color: #222 !important;
+}
+.playlist-tab:not(.active) {
+    background: #333 !important;
+    color: #ffd600 !important;
 }
 
 @media screen and (max-width: 770px) {
@@ -1285,5 +1347,14 @@ body::-webkit-scrollbar,
         align-items: center;
         min-width: 30px; /* Largeur minimale pour chaque item */
         text-align: center;
+    }
+
+    #sourate-container {
+      padding-left: 30px;
+      padding-right: 30px;
+    }
+
+    .menuR-container {
+      margin-bottom: 50px;
     }
 }

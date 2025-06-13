@@ -1,8 +1,6 @@
 // Variables globales
-let isFirstPlay = true;
 let isInitialLoad = true;
 let controlsInitialized = false;
-let isFirstInteraction = true;
 let statsWorker = null;
 let currentAudio = null;
 let currentSourateIndex = -1;
@@ -13,11 +11,19 @@ let isLoopEnabled = false;
 let currentHighlightInterval = null;
 let currentSourateAudioUrl = null;
 let currentSurahText = null;
-let isLoadingSourate = false;
-let isPlayAll = false;
 let isLearning = false;
 let carouselInitialized = false;
 const statsCache = {};
+
+// Global variable to store verse timings for highlighting
+let currentVerseTimings = null;
+
+// Variables pour les playlists
+let isPlaylistMode = false;
+let currentPlaylist = [];
+let currentPlaylistIndex = 0;
+let draftPlaylist = [];   // Playlist en cours de création/modification
+let playlistAudio = null;
 
 // === Tutoriel interactif avec effet "spotlight" ===
 let tutorialStep = 0;
@@ -805,8 +811,9 @@ function updateSourateName(sourate) {
 
 // Fonction pour mettre à jour le temps
 function updateCurrentTime() {
-    if (currentAudio) {
-        const currentTimeMs = currentAudio.currentTime * 1000;
+    const audio = playlistAudio;
+    if (audio) {
+        const currentTimeMs = audio.currentTime * 1000;
         const seconds = Math.floor(currentTimeMs / 1000) % 60;
         const minutes = Math.floor(currentTimeMs / (1000 * 60)) % 60;
         const hours = Math.floor(currentTimeMs / (1000 * 60 * 60));
@@ -814,309 +821,118 @@ function updateCurrentTime() {
         ['current-time', 'current-time-mobile'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-            el.textContent =
-                String(hours).padStart(2, '0') + ':' +
-                String(minutes).padStart(2, '0') + ':' +
-                String(seconds).padStart(2, '0');
+                el.textContent =
+                    String(hours).padStart(2, '0') + ':' +
+                    String(minutes).padStart(2, '0') + ':' +
+                    String(seconds).padStart(2, '0');
             }
         });
     }
 }
 
-// Fonction pour charger et jouer une sourate
-function loadAndPlaySourate(sheikh, sourateIndex) {
-
-    if (isFirstPlay && sourateIndex !== 0) {
-        isFirstPlay = false;
-        isPlayAll = false;
-    }
-
-    if (isLoadingSourate) return;
-    isLoadingSourate = true;
-
-    const sourate = sourates[sourateIndex];
-    currentSourateIndex = sourateIndex;
-    updateNavigationButtons();
-    currentSurahText = null;
-    
-    // Arrêter tout surlignage en cours
-    if (currentHighlightInterval) {
-        clearInterval(currentHighlightInterval);
-        currentHighlightInterval = null;
-    }
-
-    // Charger le fichier JSON spécifique au sheikh
-    loadSheikhData(sheikh)
-        .then(sheikhData => {
-            if (sheikhData && sheikhData[sourate.number]) {
-                if (currentAudio) {
-                    currentAudio.pause();
-                    clearInterval(updateInterval);
-                }
-
-                const surahData = sheikhData[sourate.number];
-                const audioUrl = surahData["audio_files"][0]["audio_url"];
-                currentSourateAudioUrl = audioUrl; // Stocker l'URL courante
-                
-                currentAudio = new Audio(audioUrl);
-                currentAudio.onplay = () => {
-                    if (!controlsInitialized) {
-                        enableControls();
-                    }
-                };
-                currentAudio.volume = currentVolume;
-                currentAudio.loop = isLoopEnabled;
-                currentVerseTimings = surahData["audio_files"][0]["verse_timings"];
-
-                // Mise à jour UI
-                updateSourateName(sourate);
-                document.querySelector('.circular-btn').style.display = 'flex';
-                document.querySelector('.circular-btn').style.opacity = '1';
-                document.querySelectorAll('.details')[0].textContent = formatDuration(surahData["audio_files"][0]["duration"]);
-                document.querySelector('.source').onclick = () => window.open(audioUrl);
-                document.querySelectorAll('.details')[1].textContent = formatSize(surahData["audio_files"][0]["file_size"]);
-                
-                // Gestionnaire pour le début de lecture
-                const onAudioStarted = () => {
-                    // Vérifier qu'on a bien le bon audio (au cas où l'utilisateur change rapidement)
-                    if (currentAudio && currentAudio.src === currentSourateAudioUrl) {
-                        isPlaying = true;
-                        ['play-pause', 'play-pause-mobile'].forEach(id => {
-                            const el = document.getElementById(id);
-                            if (el) el.textContent = '[stop]';
-                        });
-                        
-                        // Démarrer la mise à jour du temps
-                        updateInterval = setInterval(updateCurrentTime, 1000);
-                        
-                        // Démarrer le surlignage SEULEMENT maintenant
-                        currentHighlightInterval = setInterval(() => {
-                            highlightCurrentVerse();
-                        }, 200);
-                    }
-                };
-
-                // Gestionnaire pour la fin de lecture
-                currentAudio.onended = () => {
-                    clearInterval(updateInterval);
-                    clearInterval(currentHighlightInterval);
-                    updateNavigationButtons();
-
-                    if (isLoopEnabled) {
-                        currentAudio.currentTime = 0;
-                        currentAudio.play();
-                        return;
-                    }
-
-                    const isMobile = window.matchMedia('(max-width: 600px)').matches;
-                    const container = isMobile
-                        ? document.getElementById('sourate-container-mobile')
-                        : document.querySelector('.sourate-container');
-                    const sheikh = isMobile ? sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
-
-                    if (isPlayAll && currentSourateIndex < sourates.length - 1) {
-                        if (container.style.opacity === '1') {
-                            container.style.transition = 'opacity 0.3s ease';
-                            container.style.opacity = '0';
-                            setTimeout(() => {
-                                loadAndPlaySourate(sheikh, currentSourateIndex + 1);
-                                loadSurahText(currentSourateIndex).then(() => {
-                                    container.style.opacity = '1';
-                                });
-                            }, 300);
-                        } else {
-                            loadAndPlaySourate(sheikh, currentSourateIndex + 1);
-                        }
-                    } else if (isLearning && currentSourateIndex > 0) {
-                        if (container.style.opacity === '1') {
-                            container.style.transition = 'opacity 0.3s ease';
-                            container.style.opacity = '0';
-                            setTimeout(() => {
-                                loadAndPlaySourate(sheikh, currentSourateIndex - 1);
-                                loadSurahText(currentSourateIndex).then(() => {
-                                    container.style.opacity = '1';
-                                });
-                            }, 300);
-                        } else {
-                            loadAndPlaySourate(sheikh, currentSourateIndex - 1);
-                        }
-                    } else {
-                        isPlayAll = false;
-                        isPlaying = false;
-                        isFirstPlay = false;
-                        isPlayAll = false;
-                        ['play-pause', 'play-pause-mobile'].forEach(id => {
-                            const el = document.getElementById(id);
-                            if (el) el.textContent = '[play]';
-                        });
-                    }
-                };
-
-                // Démarrer la lecture
-                currentAudio.play()
-                .then(() => {
-                    onAudioStarted();
-                    isLoadingSourate = false;
-                })
-                .catch(error => {
-                    console.error('Erreur de lecture:', error);
-                    isLoadingSourate = false;
-                });
-            }
-        })
-        .catch(error => console.error('Erreur lors du chargement du fichier JSON:', error));
-}
-
-
-function highlightCurrentVerse() {
-    if (!currentAudio || !currentVerseTimings || currentAudio.paused || currentAudio.src !== currentSourateAudioUrl) {
-        return;
-    }
-
-    const currentTime = currentAudio.currentTime * 1000; // en millisecondes
-    const verseTexts = document.querySelectorAll('.verse-text');
-
-    // Réinitialiser tout surlignage
-    verseTexts.forEach(v => {
-        v.innerHTML = v.textContent; // Supprime les balises <span>
-        v.style.backgroundColor = '';
-    });
-
-    for (let i = 0; i < currentVerseTimings.length; i++) {
-        const verseTiming = currentVerseTimings[i];
-
-        if (currentTime >= verseTiming.timestamp_from && currentTime <= verseTiming.timestamp_to) {
-            const verseNumber = parseInt(verseTiming.verse_key.split(':')[1]);
-            const verseElement = document.querySelector(`.verse[data-verse="${verseNumber}"] .verse-text`);
-
-            if (!verseElement || !verseTiming.segments) return;
-
-            const verseText = verseElement.textContent;
-            const words = verseText.trim().match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]+(?:\s*[ۛۖۚۗۙۘۜ۝۞])*/g); // séparation des mots
-            let highlightedHtml = '';
-            let segmentHighlighted = false;
-            // Défilement automatique
-            const container = document.querySelector('.surah-text-container');
-            if (container) {
-                const containerRect = container.getBoundingClientRect();
-                const verseRect = verseElement.getBoundingClientRect();
-                const buffer = 300; // Marge en pixels
-
-                let scrollOffset = 0;
-
-                if (verseRect.bottom > containerRect.bottom - buffer) {
-                    scrollOffset = verseRect.bottom - containerRect.bottom + buffer;
-                }
-
-                if (scrollOffset !== 0) {
-                    container.scrollTo({
-                        top: container.scrollTop + scrollOffset,
-                        behavior: 'smooth'
-                    });
-                }
-            }
-
-
-            for (let j = 0; j < verseTiming.segments.length; j++) {
-                const segment = verseTiming.segments[j];
-                if (segment.length < 3) continue;
-
-                const [segmentIndex, from, to] = segment;
-                if (currentTime >= from && currentTime <= to) {
-                    const wordStart = segmentIndex - 1;
-                    const wordEnd = wordStart; // ou autre logique si plusieurs mots
-
-                    words.forEach((word, index) => {
-                        if (index === wordStart) {
-                            highlightedHtml += `<span style="background-color: rgba(200,200,200,0.3);">`;
-                        }
-
-                        highlightedHtml += word;
-
-                        if (index === wordEnd) {
-                            highlightedHtml += `</span>`;
-                        }
-
-                        if (index < words.length - 1) highlightedHtml += ' ';
-                    });
-
-                    verseElement.innerHTML = highlightedHtml;
-                    segmentHighlighted = true;
-                    break;
-                }
-            }
-
-            if (!segmentHighlighted) {
-                verseElement.innerHTML = words.join(' '); // pas de surlignage actif
-            }
-
-            return;
-        }
-    }
-}
-
-
-
 // Fonctions pour jouer suivant/précédent (version optimisée)
 function playNextSourate() {
-    const isMobile = window.matchMedia('(max-width: 600px)').matches;
-    const container = isMobile
-        ? document.getElementById('sourate-container-mobile')
-        : document.querySelector('.sourate-container');
-    const sheikh = isMobile ? sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+    // Cas 1: Si on est à la fin d'une playlist unitaire terminée
+    if (currentPlaylist.length === 1 && !isPlaying) {
+        const nextSourateIndex = currentSourateIndex + 1;
+        if (nextSourateIndex >= sourates.length) {
+            updateNavigationButtons();
+            return;
+        }
+        
+        currentPlaylist = [nextSourateIndex];
+        currentPlaylistIndex = 0;
+        isPlaying = true;
+        playNextInPlaylist();
+        return;
+    }
     
-    if (container.style.opacity === '1') {
-        if (currentSourateIndex < sourates.length - 1) {
-            // Transition visuelle
-            container.style.transition = 'opacity 0.3s ease';
-            container.style.opacity = '0';
-            
-            setTimeout(() => {
-                loadAndPlaySourate(sheikh, currentSourateIndex + 1);
-                loadSurahText(currentSourateIndex).then(() => {
-                    container.style.opacity = '1';
-                });
-            }, 300);
+    // Cas 2: Lecture en cours dans une playlist unitaire
+    if (isPlaying && currentPlaylist.length === 1) {
+        if (currentAudio) {
+            currentAudio.pause();
+            clearInterval(updateInterval);
+            clearInterval(currentHighlightInterval);
+        }
+        
+        const nextSourateIndex = currentSourateIndex + 1;
+        if (nextSourateIndex >= sourates.length) {
+            updateNavigationButtons();
+            return;
+        }
+        
+        currentPlaylist = [nextSourateIndex];
+        currentPlaylistIndex = 0;
+        playNextInPlaylist();
+        return;
+    }
+    
+    // Cas 3: Mode playlist normal
+    if (currentPlaylistIndex >= currentPlaylist.length - 1) {
+        const nextSourateIndex = currentSourateIndex + 1;
+        if (nextSourateIndex < sourates.length) {
+            currentPlaylist.push(nextSourateIndex);
         } else {
             updateNavigationButtons();
             return;
         }
-    } else if (currentAudio) {
-        // Mode audio seul
-        currentAudio.pause();
-        if (currentSourateIndex < sourates.length - 1) {
-            loadAndPlaySourate(sheikh, currentSourateIndex + 1);
-        }
     }
+    
+    currentPlaylistIndex++;
+    playNextInPlaylist();
 }
 
 function playPrevSourate() {
-    const isMobile = window.matchMedia('(max-width: 600px)').matches;
-    const container = isMobile
-        ? document.getElementById('sourate-container-mobile')
-        : document.querySelector('.sourate-container');
-    const sheikh = isMobile ? sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
-    if (container.style.opacity === '1') {
-        if (currentSourateIndex > 0) {
-            container.style.transition = 'opacity 0.3s ease';
-            container.style.opacity = '0';
-            
-            setTimeout(() => {
-                loadAndPlaySourate(sheikh, currentSourateIndex - 1);
-                loadSurahText(currentSourateIndex).then(() => {
-                    container.style.opacity = '1';
-                });
-            }, 300);
+    // Cas 1: Si on est au début d'une playlist unitaire terminée
+    if (currentPlaylist.length === 1 && !isPlaying) {
+        const prevSourateIndex = currentSourateIndex - 1;
+        if (prevSourateIndex < 0) {
+            updateNavigationButtons();
+            return;
+        }
+
+        currentPlaylist = [prevSourateIndex];
+        currentPlaylistIndex = 0;
+        isPlaying = true;
+        playNextInPlaylist();
+        return;
+    }
+
+    // Cas 2: Lecture en cours dans une playlist unitaire
+    if (isPlaying && currentPlaylist.length === 1) {
+        if (currentAudio) {
+            currentAudio.pause();
+            clearInterval(updateInterval);
+            clearInterval(currentHighlightInterval);
+        }
+
+        const prevSourateIndex = currentSourateIndex - 1;
+        if (prevSourateIndex < 0) {
+            updateNavigationButtons();
+            return;
+        }
+
+        currentPlaylist = [prevSourateIndex];
+        currentPlaylistIndex = 0;
+        playNextInPlaylist();
+        return;
+    }
+
+    // Cas 3: Mode playlist normal
+    if (currentPlaylistIndex <= 0) {
+        const prevSourateIndex = currentSourateIndex - 1;
+        if (prevSourateIndex >= 0) {
+            currentPlaylist.unshift(prevSourateIndex);
+            currentPlaylistIndex = 0;
         } else {
             updateNavigationButtons();
             return;
         }
-    } else if (currentAudio) {
-        currentAudio.pause();
-        if (currentSourateIndex > 0) {
-            loadAndPlaySourate(sheikh, currentSourateIndex - 1);
-        }
+    } else {
+        currentPlaylistIndex--;
     }
+
+    playNextInPlaylist();
 }
 
 // Fonction pour charger le texte d'une sourate
@@ -1210,15 +1026,17 @@ function createOverlay(data) {
     playSpan.className = 'action play';
     const label = document.createElement('span');
     label.className = 'label';
-    label.textContent = '[all]';
+    label.textContent = '[tilāwah]';
     label.setAttribute('ontouchend', '')
     label.onclick = () => {
-        isPlayAll = !isPlayAll;
-        if (isPlayAll) {
-            label.classList.add('active');
-        } else {
-            label.classList.remove('active');
-        }
+        isInitialLoad = false;
+        currentPlaylist = Array.from({ length: sourates.length }, (_, i) => i);
+        currentPlaylistIndex = 0;
+        document.querySelector('.circular-btn').style.display = 'flex';
+        document.querySelector('.circular-btn').style.opacity = '1';
+        togglePlaylistMode();
+        enableControls();
+        playCurrentPlaylist();
     };
     
     const detailsDuration = document.createElement('span');
@@ -1284,12 +1102,59 @@ function createOverlay(data) {
     const learning = document.createElement('span');
     learning.className = 'learning';
     learning.textContent = '[learningPath]';
-    learning.onclick = () => {
+    learning.onclick = async () => {
         isLearning = !isLearning;
+        isInitialLoad = false;
+
         if (isLearning) {
+            // Mode Learning Path activé
             learning.classList.add('active');
+            
+            // Créer la playlist inversée
+            currentPlaylist = Array.from({ length: sourates.length }, (_, i) => sourates.length - 1 - i);
+            currentPlaylistIndex = 0;
+            
+            // Préparer l'interface
+            document.querySelector('.circular-btn').style.display = 'flex';
+            document.querySelector('.circular-btn').style.opacity = '1';
+            
+            // Si déjà en lecture, on redémarre
+            if (isPlaying && playlistAudio && !playlistAudio.paused) {
+                playlistAudio.pause();
+                clearInterval(updateInterval);
+                clearInterval(currentHighlightInterval);
+            }
+            
+            // Démarrer la lecture
+            togglePlaylistMode();
+            enableControls();
+            await playCurrentPlaylist();
         } else {
+            // Mode Learning Path désactivé
             learning.classList.remove('active');
+            
+            // Si en cours de lecture
+            if (isPlaying && playlistAudio && !playlistAudio.paused) {
+                // Option 1: Continuer la lecture de la sourate actuelle puis s'arrêter
+                playlistAudio.onended = () => {
+                    ['play-pause', 'play-pause-mobile'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = '[play]';
+                    });
+                };
+                
+                // On réduit la playlist à la sourate actuelle seulement
+                currentPlaylist = [currentSourateIndex];
+                currentPlaylistIndex = 0;
+
+            } else {
+                // Si pas en lecture, juste réinitialiser
+                currentPlaylist = [currentSourateIndex];
+                isPlaying = false;
+            }
+            
+            // Mettre à jour l'interface
+            updatePlaylistUI && updatePlaylistUI();
         }
     };
 
@@ -1311,12 +1176,16 @@ function createOverlay(data) {
         `;
         item.onclick = () => {
             isInitialLoad = false;
-            isFirstInteraction = false;
             if (!controlsInitialized) {
                 enableControls();
             }
             const sheikh = data;
-            loadAndPlaySourate(sheikh, sourates.indexOf(sourate));
+            currentPlaylist = [sourates.indexOf(sourate)];
+            currentPlaylistIndex = 0;
+            document.querySelector('.circular-btn').style.display = 'flex';
+            document.querySelector('.circular-btn').style.opacity = '1';
+            togglePlaylistMode();
+            playCurrentPlaylist();
         };
     
         list.appendChild(item);
@@ -1512,14 +1381,16 @@ function createOverlayMobile(data) {
         playSpan.className = 'action play mobile';
         const label = document.createElement('span');
         label.className = 'label';
-        label.textContent = '[all]';
+        label.textContent = '[tilāwah]';
         label.onclick = () => {
-            isPlayAll = !isPlayAll;
-            if (isPlayAll) {
-                label.classList.add('active');
-            } else {
-                label.classList.remove('active');
-            }
+            isInitialLoad = false;
+            currentPlaylist = Array.from({ length: sourates.length }, (_, i) => i);
+            currentPlaylistIndex = 0;
+            document.querySelector('.circular-btn').style.display = 'flex';
+            document.querySelector('.circular-btn').style.opacity = '1';
+            togglePlaylistMode();
+            enableControls();
+            playCurrentPlaylist();
         };
         
         const detailsDuration = document.createElement('span');
@@ -1580,17 +1451,64 @@ function createOverlayMobile(data) {
         const learning = document.createElement('span');
         learning.className = 'learning mobile';
         learning.textContent = '[learningPath]';
-        learning.onclick = () => {
+        learning.onclick = async () => {
             isLearning = !isLearning;
+            isInitialLoad = false;
+
             if (isLearning) {
+                // Mode Learning Path activé
                 learning.classList.add('active');
+                
+                // Créer la playlist inversée
+                currentPlaylist = Array.from({ length: sourates.length }, (_, i) => sourates.length - 1 - i);
+                currentPlaylistIndex = 0;
+                
+                // Préparer l'interface
+                document.querySelector('.circular-btn').style.display = 'flex';
+                document.querySelector('.circular-btn').style.opacity = '1';
+                
+                // Si déjà en lecture, on redémarre
+                if (isPlaying && playlistAudio && !playlistAudio.paused) {
+                    playlistAudio.pause();
+                    clearInterval(updateInterval);
+                    clearInterval(currentHighlightInterval);
+                }
+                
+                // Démarrer la lecture
+                togglePlaylistMode();
+                enableControls();
+                await playCurrentPlaylist();
             } else {
+                // Mode Learning Path désactivé
                 learning.classList.remove('active');
+                
+                // Si en cours de lecture
+                if (isPlaying && playlistAudio && !playlistAudio.paused) {
+                    // Option 1: Continuer la lecture de la sourate actuelle puis s'arrêter
+                    playlistAudio.onended = () => {
+                        ['play-pause', 'play-pause-mobile'].forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) el.textContent = '[play]';
+                        });
+                    };
+                    
+                    // On réduit la playlist à la sourate actuelle seulement
+                    currentPlaylist = [currentSourateIndex];
+                    currentPlaylistIndex = 0;
+
+                } else {
+                    // Si pas en lecture, juste réinitialiser
+                    currentPlaylist = [currentSourateIndex];
+                    isPlaying = false;
+                }
+                
+                // Mettre à jour l'interface
+                updatePlaylistUI && updatePlaylistUI();
             }
         };
 
-        mediaInfo.appendChild(learning);
-        overlay.appendChild(mediaInfo);
+    mediaInfo.appendChild(learning);
+    overlay.appendChild(mediaInfo);
 
     }
         
@@ -1626,14 +1544,18 @@ function createOverlayMobile(data) {
             <div class="sourate-arabic">${sourate.arabicname}</div>
             `;
             item.onclick = () => {
-                isInitialLoad = false;
-                isFirstInteraction = false;
-                if (!controlsInitialized) {
-                    enableControls();
-                }
-                const sheikh = data;
-                loadAndPlaySourate(sheikh, sourates.indexOf(sourate));
-            };
+            isInitialLoad = false;
+            if (!controlsInitialized) {
+                enableControls();
+            }
+            const sheikh = data;
+            currentPlaylist = [sourates.indexOf(sourate)];
+            currentPlaylistIndex = 0;
+            document.querySelector('.circular-btn').style.display = 'flex';
+            document.querySelector('.circular-btn').style.opacity = '1';
+            togglePlaylistMode();
+            playCurrentPlaylist();
+        };
         
             list.appendChild(item);
         });
@@ -1733,6 +1655,94 @@ async function toggleMainScreenPhone() {
             }
         }
     }
+}
+
+function highlightCurrentVerse() {
+    // Vérifier si l'audio ou les timings sont disponibles ou si le conteneur n'existe pas
+    const container = document.querySelector('.sourate-container');
+    if (!container || container.style.display === 'none' || container.style.opacity === '0') {
+        return; // Ne rien faire si le conteneur n'est pas visible
+    }
+
+    const currentTime = playlistAudio.currentTime * 1000; // Convertir en millisecondes
+    const verseTexts = document.querySelectorAll('.verse-text');
+
+    // Réinitialiser tout surlignage précédent
+    verseTexts.forEach(v => {
+        v.innerHTML = v.textContent;
+        v.style.backgroundColor = '';
+    });
+    // Trouver le verset correspondant au moment actuel
+    for (let i = 0; i < currentVerseTimings.length; i++) {
+        const verseTiming = currentVerseTimings[i];
+        if (currentTime >= verseTiming.timestamp_from && currentTime <= verseTiming.timestamp_to) {
+            const verseNumber = parseInt(verseTiming.verse_key.split(':')[1]);
+            const verseElement = document.querySelector(`.verse[data-verse="${verseNumber}"] .verse-text`);
+
+            if (!verseElement || !verseTiming.segments) return;
+
+            const verseText = verseElement.textContent;
+            const words = verseText.trim().match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]+(?:\s*[ۛۖۚۗۙۘۜ۝۞])*/g);
+            let highlightedHtml = '';
+            let segmentHighlighted = false;
+
+            // Défilement automatique pour garder le verset visible
+            const container = document.querySelector('.surah-text-container');
+            if (container) {
+                const containerRect = container.getBoundingClientRect();
+                const verseRect = verseElement.getBoundingClientRect();
+                const buffer = 300; // Marge en pixels
+
+                if (verseRect.bottom > containerRect.bottom - buffer) {
+                    container.scrollTo({
+                        top: container.scrollTop + (verseRect.bottom - containerRect.bottom + buffer),
+                        behavior: 'smooth'
+                    });
+                }
+            }
+
+            // Surligner le mot courant en fonction du segment audio
+            for (let j = 0; j < verseTiming.segments.length; j++) {
+                const segment = verseTiming.segments[j];
+                if (segment.length < 3) continue;
+
+                const [segmentIndex, from, to] = segment;
+                if (currentTime >= from && currentTime <= to) {
+                    const wordIndex = segmentIndex - 1; // Les segments commencent à 1
+
+                    highlightedHtml = words.map((word, index) => {
+                        return index === wordIndex 
+                            ? `<span class="current-segment">${word}</span>`
+                            : word;
+                    }).join(' ');
+
+                    verseElement.innerHTML = highlightedHtml;
+                    segmentHighlighted = true;
+                    break;
+                }
+            }
+
+            // Si aucun segment n'est actif, afficher le texte normal
+            if (!segmentHighlighted) {
+                verseElement.innerHTML = words.join(' ');
+            }
+
+            return; // On a trouvé le verset, on peut sortir
+        }
+    }
+}
+
+// Appeler cette fonction régulièrement pendant la lecture
+function startHighlightInterval() {
+    console.log("Démarrage de l'intervalle de surlignage");
+    clearInterval(currentHighlightInterval); // Nettoyer l'intervalle précédent
+    currentHighlightInterval = setInterval(highlightCurrentVerse, 100); // Vérifier toutes les 100ms
+}
+
+// Arrêter le suivi du surlignage
+function stopHighlightInterval() {
+    clearInterval(currentHighlightInterval);
+    currentHighlightInterval = null;
 }
 
 function displaySurahText(surahData, isMobile) {
@@ -1897,9 +1907,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Initialiser la logique du carrousel
-if (!carouselInitialized) {
+    if (!carouselInitialized) {
         initCarouselLogic();
     }
+
 });
 
 function initCarouselLogic() {
@@ -2269,7 +2280,7 @@ window.initializeSheikh = function (index) {
         setTimeout(() => {
             // Afficher doucement menuL et menuR
             updateNavigationButtons();
-            if (isFirstInteraction) disableControls();
+            if (isInitialLoad) disableControls();
             menuL.style.transition = 'opacity 0.4s ease';
             menuR.style.transition = 'opacity 0.4s ease';
             menuL.style.opacity = '1';
@@ -2328,7 +2339,13 @@ window.initializeSheikh = function (index) {
                 if (codestyle) applyTextReveal(codestyle, 600, 100);
                 if (audiocontrol) applyTextReveal(audiocontrol, 600, 200);
                 if (sheikhstats) applyTextReveal(sheikhstats, 600, 300);
+
             }
+            const playlistBtn = document.getElementById('playlist');
+            playlistBtn.style.display = 'flex';
+            playlistBtn.style.opacity = '1';
+            playlistBtn.style.right = '100px';
+            playlistBtn.addEventListener('click', togglePlaylistMode);
 
         }, 800);
 
@@ -2416,42 +2433,34 @@ window.addEventListener("DOMContentLoaded", () => {
     const el = document.getElementById(id);
     if (el) {
         el.addEventListener('click', () => {
-            if (isInitialLoad || !currentAudio) {
+            if (isInitialLoad) {
                 // Premier chargement ou pas d'audio chargé
                 isInitialLoad = false;
-                isFirstPlay = true;
-                isPlayAll = true;
-                isFirstInteraction = false;
-                
-                loadAndPlaySourate(window.matchMedia('(max-width: 600px)').matches ?
-                    sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : 
-                    sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent), 0); 
+
+                // Lance une playlist contenant toutes les sourates
+                currentPlaylist = Array.from({ length: sourates.length }, (_, i) => i);
+                currentPlaylistIndex = 0;
+                document.querySelector('.circular-btn').style.display = 'flex';
+                document.querySelector('.circular-btn').style.opacity = '1';
+                togglePlaylistMode();
+                enableControls();
+                playCurrentPlaylist();
                 return;
             }
 
-            if (isPlaying) {
-                // Comportement normal stop
-                currentAudio.pause();
-                isPlaying = false;
-                el.textContent = '[play]';
-                clearInterval(updateInterval);
-                clearInterval(currentHighlightInterval);
-                isFirstPlay = false;
-            } else {
-                currentAudio.play()
-                    .then(() => {
-                        if (!controlsInitialized) {
-                            enableControls();
-                        }
-                        isPlaying = true;
-                        el.textContent = '[stop]';
-                        updateInterval = setInterval(updateCurrentTime, 1000);
-
-                        if (currentHighlightInterval) clearInterval(currentHighlightInterval);
-                        currentHighlightInterval = setInterval(() => {
-                            highlightCurrentVerse();
-                        }, 200);
-                    });
+            // Si une playlist est déjà en cours de lecture ou en pause
+            if (playlistAudio) {
+                if (playlistAudio.paused) {
+                    playlistAudio.play();
+                    isPlaying = true;
+                    el.textContent = '[stop]';
+                    updateInterval = setInterval(updateCurrentTime, 1000);
+                } else {
+                    playlistAudio.pause();
+                    isPlaying = false;
+                    el.textContent = '[play]';
+                    clearInterval(updateInterval);
+                }
             }
         });
     }
@@ -2474,8 +2483,9 @@ window.addEventListener("DOMContentLoaded", () => {
     const el = document.getElementById(id);
     if (el) {
         el.addEventListener('click', () => {
-            if (currentAudio) {
-                currentAudio.currentTime = Math.min(currentAudio.currentTime + 30, currentAudio.duration);
+            const audio = playlistAudio;
+            if (audio) {
+                audio.currentTime = Math.min(audio.currentTime + 30, audio.duration);
                 updateCurrentTime();
             }
         });
@@ -2486,8 +2496,9 @@ window.addEventListener("DOMContentLoaded", () => {
     const el = document.getElementById(id);
     if (el) {
         el.addEventListener('click', () => {
-            if (currentAudio) {
-                currentAudio.currentTime = Math.max(currentAudio.currentTime - 30, 0);
+            const audio = playlistAudio;
+            if (audio) {
+                audio.currentTime = Math.max(audio.currentTime - 30, 0);
                 updateCurrentTime();
             }
         });
@@ -2542,6 +2553,12 @@ window.addEventListener("DOMContentLoaded", () => {
 function toggleLoopMode() {
     isLoopEnabled = !isLoopEnabled;
     
+    // Mettre à jour l'audio actif
+    const activeAudio = playlistAudio;
+    if (activeAudio) {
+        activeAudio.loop = isLoopEnabled;
+    }
+    
     // Mettre à jour l'UI
     ['loop-mode', 'loop-mode-mobile'].forEach(id => {
         const el = document.getElementById(id);
@@ -2556,13 +2573,6 @@ function toggleLoopMode() {
             }
         }
     });
-    
-    // Si on active le loop et qu'un audio est en cours, modifier son comportement
-    if (currentAudio && isLoopEnabled) {
-        currentAudio.loop = true;
-    } else if (currentAudio) {
-        currentAudio.loop = false;
-    }
 }
 
 ['loop-mode', 'loop-mode-mobile'].forEach(id => {
@@ -2913,3 +2923,806 @@ function debouncedHandleTabletMenus() {
 window.addEventListener('resize', debouncedHandleTabletMenus);
 window.addEventListener('DOMContentLoaded', handleTabletMenus);
 document.addEventListener('astro:after-swap', handleTabletMenus);
+
+// Fonction pour gérer les playlists
+function togglePlaylistMode() {
+    isPlaylistMode = !isPlaylistMode;
+    
+    // Afficher/cacher les boutons d'ajout aux playlists
+    document.querySelectorAll('.sourate-item').forEach(item => {
+        // Cherche le bouton d'ajout existant
+        item.style.pointerEvents = isPlaylistMode ? 'none' : 'auto';
+        let addBtn = item.querySelector('.add-to-playlist');
+        if (isPlaylistMode && !addBtn) {
+            // Crée le bouton rond avec un +
+            addBtn = document.createElement('span');
+            addBtn.className = 'add-to-playlist';
+
+            addBtn.innerHTML = `
+                <span style="
+                    display: flex;
+                    justify-content: center;
+                    width: 38px;
+                    height: 38px;
+                    border-radius: 50%;
+                    background: #2c3e50;
+                    color: #fff;
+                    font-weight: bold;
+                    font-size: 23px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                    transition: background-color 0.3s, transform 0.2s;
+                    z-index: 1000;
+                    border: none;
+                    cursor: pointer;
+                    pointer-events: auto;
+                ">+</span>
+            `;
+            addBtn.style.setProperty('justify-content', 'center');
+            addBtn.style.setProperty('align-items', 'center');
+            addBtn.style.setProperty('pointer-events', 'auto');
+            addBtn.style.setProperty('width', '100px');
+            addBtn.style.setProperty('height', '70px');
+            addBtn.style.setProperty('background', 'transparent');
+            addBtn.style.setProperty('top', '50%');
+            addBtn.style.setProperty('right', '20px');
+            addBtn.style.setProperty('transform', 'translateY(-50%)');
+            addBtn.style.setProperty('display', 'flex');
+            addBtn.style.setProperty('alignItems', 'center');
+            addBtn.style.setProperty('justifyContent', 'center'); 
+            addBtn.style.setProperty('zIndex', '2');
+            addBtn.style.setProperty('position', 'absolute');
+            addBtn.style.setProperty('opacity', '0');
+            addBtn.style.setProperty('transition', 'opacity 0.2s');
+            addBtn.style.setProperty('cursor', 'pointer');
+            addBtn.style.setProperty('border', 'none');
+            addBtn.style.setProperty('boxSizing', 'content-box');
+
+            // Hover/active effect for the button
+            addBtn.onmouseenter = () => {
+                const inner = addBtn.firstElementChild;
+                inner.style.backgroundColor = '#34495e';
+                inner.style.transform = 'scale(1.1)';
+            };
+            addBtn.onmouseleave = () => {
+                const inner = addBtn.firstElementChild;
+                inner.style.backgroundColor = '#2c3e50';
+                inner.style.transform = 'scale(1)';
+            };
+            addBtn.onmousedown = () => {
+                const inner = addBtn.firstElementChild;
+                inner.style.transform = 'scale(0.95)';
+            };
+            addBtn.onmouseup = () => {
+                const inner = addBtn.firstElementChild;
+                inner.style.transform = 'scale(1.1)';
+            };
+
+            // Empêche la lecture de la sourate au clic sur le bouton +
+            addBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const sourateNumber = parseInt(item.querySelector('.sourate-number').textContent);
+                addSourateToPlaylist(sourateNumber - 1);
+            });
+
+            // Ajoute le bouton à l'item
+            item.style.position = 'relative';
+            item.appendChild(addBtn);
+
+            // Affiche le bouton uniquement au survol
+            item.addEventListener('mouseenter', () => {
+                addBtn.style.opacity = '1';
+            });
+            item.addEventListener('mouseleave', () => {
+                addBtn.style.opacity = '0';
+            });
+        } else if (!isPlaylistMode && addBtn) {
+            addBtn.remove();
+        }
+    });
+    
+    // Afficher/cacher l'interface de playlist
+    const playlistInterface = document.getElementById('playlist-interface');
+    if (playlistInterface) {
+        playlistInterface.style.display = isPlaylistMode ? 'block' : 'none';
+    } else if (isPlaylistMode) {
+        createPlaylistInterface();
+    }
+    
+    // Mettre à jour l'apparence du bouton playlist
+    const playlistBtn = document.getElementById('playlist');
+    if (isPlaylistMode) {
+        playlistBtn.classList.add('active');
+    } else {
+        playlistBtn.classList.remove('active');
+    }
+}
+
+function createPlaylistInterface() {
+    // Trouver le bouton playlist pour positionner l'interface juste au-dessus
+    const playlistBtn = document.getElementById('playlist');
+    const container = document.createElement('div');
+    container.id = 'playlist-interface';
+    container.style.position = 'absolute';
+    container.style.backgroundColor = '#222';
+    container.style.padding = '20px';
+    container.style.borderRadius = '10px';
+    container.style.zIndex = '100000';
+    container.style.width = '350px';
+    container.style.height = '450px';
+    container.style.overflow = 'auto';
+    const btnRect = playlistBtn.getBoundingClientRect();
+    container.style.bottom = `${window.innerHeight - btnRect.top + 20}px`;
+    container.style.right = '20px';
+    
+    container.innerHTML = `
+        <div style="display:flex;gap:10px;margin-bottom:20px;">
+            <button id="tab-current-playlist" class="playlist-tab active" style="border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:bold;">En cours</button>
+            <button id="tab-create-playlist" class="playlist-tab" style="border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:bold;">Créer</button>
+            <button id="tab-my-playlists" class="playlist-tab" style="border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:bold;">Mes playlists</button>
+        </div>
+        <div id="playlist-tabs-content" style="position:relative;height:400px;overflow:auto;overflow-x:hidden;">
+            <div id="current-playing-playlist">
+                <div id="current-playing-items" style="margin:0;height:360px;display:flex;flex-direction:column;align-items:stretch;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth;"></div>
+            </div>
+            <div id="create-playlist" style="display:none;height:100%;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <input id="playlist-name" type="text" placeholder="Nom de la playlist" style="flex:1;padding:6px 10px;border-radius:5px;border:1px solid #444;background:#222;color:#ffd600;font-size:1em;">
+                    <button id="save-playlist" title="Enregistrer la playlist" style="background:none;border:none;cursor:pointer;padding:0;">
+                        <span style="font-size:1.5em;color:#ffd600;vertical-align:middle;">&#128190;</span>
+                    </button>
+                </div>
+                <button id="clear-playlist" style="background:transparent;color:#fff;cursor:pointer;border:transparent;font-size: 13px;">Effacer</button>
+                <hr style="border:0;border-top:1px solid #444;margin:0px;margin-bottom:10px;">
+                <div style="margin-bottom:15px;">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <select id="start-surah" class="custom-select compact">
+                            ${sourates.map(s => `<option value="${s.number-1}">${s.number}. ${s.name}</option>`).join('')}
+                        </select>
+                        <select id="end-surah" class="custom-select compact">
+                            ${sourates.map(s => `<option value="${s.number-1}">${s.number}. ${s.name}</option>`).join('')}
+                        </select>
+                        <button id="add-range" class="custom-button compact">Ajouter</button>
+                    </div>
+                </div>
+                <div id="playlist-items" style="margin:0;min-height:160px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;text-align:center;width:100%;"></div>
+            </div>
+            <div id="saved-playlists" style="display:none;height:100%;">
+                <h4>Playlists sauvegardées</h4>
+                <div id="saved-playlists-list" style="height:calc(100% - 30px);overflow:auto;"></div>
+            </div>
+        </div>
+        <button id="play-playlist" style="background:#55ff55;color:#222;border:none;padding:5px 10px;border-radius:15px;cursor:pointer;width: 20%;position:absolute;left:50%;transform:translateX(-50%);bottom:20px;z-index:100001;margin-top:40px;">
+            <span style="font-size:1.5em;vertical-align:middle;">&#9654;</span>
+        </button>
+        <button id="close-playlist" style="position:absolute;top:10px;right:10px;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+    `;
+
+    // Ajouter le style pour les onglets
+    const style = document.createElement('style');
+    style.textContent = `
+        .playlist-tab {
+            background: #333;
+            color: #ffd600;
+            transition: all 0.2s ease;
+        }
+        .playlist-tab.active {
+            background: #ffd600 !important;
+            color: #222 !important;
+        }
+        .playlist-tab:hover:not(.active) {
+            background: #444;
+        }
+    `;
+    container.appendChild(style);
+
+    document.body.appendChild(container);
+    
+    // Éléments DOM
+    const tabCurrent = container.querySelector('#tab-current-playlist');
+    const tabCreate = container.querySelector('#tab-create-playlist');
+    const tabMy = container.querySelector('#tab-my-playlists');
+    const currentPlayingDiv = container.querySelector('#current-playing-playlist');
+    const createPlaylistDiv = container.querySelector('#create-playlist');
+    const savedPlaylistsDiv = container.querySelector('#saved-playlists');
+
+    // Fonction pour changer d'onglet
+    function switchTab(activeTab) {
+        // Désactiver tous les onglets
+        [tabCurrent, tabCreate, tabMy].forEach(tab => tab.classList.remove('active'));
+        [currentPlayingDiv, createPlaylistDiv, savedPlaylistsDiv].forEach(div => div.style.display = 'none');
+
+        // Activer l'onglet sélectionné
+        activeTab.classList.add('active');
+        if (activeTab === tabCurrent) {
+            currentPlayingDiv.style.display = '';
+            updateCurrentPlayingUI();
+        } else if (activeTab === tabCreate) {
+            createPlaylistDiv.style.display = '';
+        } else if (activeTab === tabMy) {
+            savedPlaylistsDiv.style.display = '';
+            loadSavedPlaylists();
+        }
+    }
+
+    // Écouteurs d'événements
+    tabCurrent.addEventListener('click', () => switchTab(tabCurrent));
+    tabCreate.addEventListener('click', () => switchTab(tabCreate));
+    tabMy.addEventListener('click', () => switchTab(tabMy));
+    
+    document.getElementById('close-playlist').addEventListener('click', togglePlaylistMode);
+    document.getElementById('save-playlist').addEventListener('click', saveCurrentPlaylist);
+    document.getElementById('clear-playlist').addEventListener('click', clearCurrentPlaylist);
+    document.getElementById('play-playlist').addEventListener('click', playCurrentPlaylist);
+    document.getElementById('add-range').addEventListener('click', addSurahRangeToPlaylist);
+
+    // Activer l'onglet "En cours" par défaut
+    switchTab(tabCurrent);
+    updatePlaylistUI();
+}
+
+function updatePlaylistUI() {
+    const playlistItems = document.getElementById('playlist-items');
+    if (!playlistItems) return;
+    
+    playlistItems.innerHTML = '';
+    
+    if (draftPlaylist.length === 0) {
+        playlistItems.innerHTML = '<p>Aucune sourate dans la playlist</p>';
+        return;
+    }
+    
+    draftPlaylist.forEach((sourateIndex, index) => {
+        const sourate = sourates[sourateIndex];
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.margin = '5px 0';
+        item.style.padding = '5px';
+        item.style.backgroundColor = '#333';
+        item.style.borderRadius = '5px';
+        
+        item.innerHTML = `
+            <span>${sourate.number}. ${sourate.name} (${sourate.arabicname})</span>
+            <span class="remove-from-playlist" data-index="${index}" style="cursor:pointer;color:#ff5555;">[×]</span>
+        `;
+        
+        playlistItems.appendChild(item);
+    });
+    
+    document.querySelectorAll('.remove-from-playlist').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const index = parseInt(e.target.getAttribute('data-index'));
+            draftPlaylist.splice(index, 1);
+            updatePlaylistUI();
+        });
+    });
+}
+
+
+function updateCurrentPlayingUI() {
+    const playlistItems = document.getElementById('current-playing-items');
+    if (!playlistItems) return;
+    
+    // Sauvegarder la position de scroll
+    const scrollTop = playlistItems.scrollTop;
+    
+    playlistItems.innerHTML = '';
+    
+    if (currentPlaylist.length === 0) {
+        playlistItems.innerHTML = '<p>Aucune sourate dans la playlist en cours</p>';
+        return;
+    }
+    
+    // Créer le style pour le drag-and-drop (une seule fois)
+    if (!document.getElementById('playlist-dnd-style')) {
+        const style = document.createElement('style');
+        style.id = 'playlist-dnd-style';
+        style.textContent = `
+            #current-playing-items .dragging {
+                opacity: 0.5;
+                background: transparent !important;
+            }
+            
+            #current-playing-items .dragging * {
+                opacity: 0;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Créer les éléments de playlist
+    currentPlaylist.forEach((sourateIndex, index) => {
+        const sourate = sourates[sourateIndex];
+        const item = document.createElement('div');
+        item.className = 'playlist-item';
+        item.dataset.index = index;
+        item.dataset.sourateId = sourateIndex;
+        item.draggable = true;
+        
+        // Appliquer le style textuel existant
+        Object.assign(item.style, {
+            display: 'flex',
+            justifyContent: 'space-between',
+            margin: '5px 0',
+            padding: '12px',
+            backgroundColor: index === currentPlaylistIndex ? '#444' : '#333',
+            borderRadius: '5px',
+            transition: 'all 0.2s ease',
+            cursor: 'grab',
+            userSelect: 'none'
+        });
+        
+        item.innerHTML = `
+            <span>${sourate.number}. ${sourate.name} (${sourate.arabicname})</span>
+            <div>
+                ${index === currentPlaylistIndex ? '<span style="color:#ffd600;">[en cours]</span>' : ''}
+                <span class="remove-from-current-playlist" data-index="${index}" style="cursor:pointer;color:#ff5555;margin-left:10px;">[×]</span>
+            </div>
+        `;
+        
+        playlistItems.appendChild(item);
+    });
+    
+    // Drag & drop implementation
+    let draggingItem = null;
+    
+    playlistItems.querySelectorAll('.playlist-item').forEach(item => {
+        item.addEventListener('dragstart', () => {
+            draggingItem = item;
+            setTimeout(() => item.classList.add('dragging'), 0);
+        });
+        
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            draggingItem = null;
+            updatePlaylistOrderFromDOM();
+        });
+    });
+    
+    playlistItems.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (!draggingItem) return;
+        
+        // Défilement automatique
+        autoScrollDuringDrag(playlistItems, e);
+        
+        // Gestion du positionnement
+        const afterElement = getDragAfterElement(playlistItems, e.clientY);
+        if (afterElement) {
+            playlistItems.insertBefore(draggingItem, afterElement);
+        } else {
+            playlistItems.appendChild(draggingItem);
+        }
+        
+        // Optimisation des performances
+        e.dataTransfer.dropEffect = "move";
+    });
+    
+    // Gestion des boutons de suppression
+    document.querySelectorAll('.remove-from-current-playlist').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const index = parseInt(e.target.getAttribute('data-index'));
+            currentPlaylist.splice(index, 1);
+            
+            // Ajuster l'index courant si nécessaire
+            if (currentPlaylistIndex > index) {
+                currentPlaylistIndex--;
+            } else if (currentPlaylistIndex === index) {
+                currentPlaylistIndex = 0;
+            }
+            
+            updateCurrentPlayingUI();
+        });
+    });
+    
+    // Restaurer la position de scroll
+    playlistItems.scrollTop = scrollTop;
+    
+    // Helper functions
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.playlist-item:not(.dragging)')];
+        
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+    
+    function updatePlaylistOrderFromDOM() {
+        const items = [...playlistItems.querySelectorAll('.playlist-item')];
+        const newOrder = items.map(item => parseInt(item.dataset.sourateId));
+        
+        // Trouver le nouvel index courant
+        const currentItem = items.find(item => 
+            item.querySelector('[style*="color:#ffd600"]')
+        );
+        const newCurrentIndex = currentItem ? items.indexOf(currentItem) : currentPlaylistIndex;
+        
+        // Mettre à jour les données
+        currentPlaylist = newOrder;
+        currentPlaylistIndex = newCurrentIndex;
+        
+        // Rafraîchir sans animation pour éviter le clignotement
+        const newScroll = playlistItems.scrollTop;
+        updateCurrentPlayingUI();
+        playlistItems.scrollTop = newScroll;
+    }
+}
+
+function autoScrollDuringDrag(container, event) {
+    // Configuration de base
+    const baseScrollSpeed = 5; // Vitesse de base
+    const scrollThreshold = 50; // Zone d'activation (en pixels)
+    const maxScrollSpeed = 50; // Vitesse maximale
+    const accelerationZone = 150; // Zone d'accélération (au-delà du threshold)
+    
+    const rect = container.getBoundingClientRect();
+    const mouseY = event.clientY;
+    const containerTop = rect.top;
+    const containerBottom = rect.bottom;
+    
+    // Calcul de la distance au-delà des seuils
+    let distanceBeyondThreshold = 0;
+    let scrollDirection = 0; // 0 = pas de scroll, -1 = up, 1 = down
+    
+    // Vérifier si on est dans la zone haute
+    if (mouseY < containerTop + scrollThreshold) {
+        distanceBeyondThreshold = Math.max(0, (containerTop + scrollThreshold) - mouseY);
+        scrollDirection = -1; // Scroll up
+    } 
+    // Vérifier si on est dans la zone basse
+    else if (mouseY > containerBottom - scrollThreshold) {
+        distanceBeyondThreshold = Math.max(0, mouseY - (containerBottom - scrollThreshold));
+        scrollDirection = 1; // Scroll down
+    }
+    
+    // Retirer les classes de feedback visuel
+    container.classList.remove('scrolling-up', 'scrolling-down');
+    
+    // Si on doit scroller
+    if (scrollDirection !== 0) {
+        // Calcul de la vitesse avec accélération progressive
+        let speed = baseScrollSpeed;
+        
+        if (distanceBeyondThreshold > 0) {
+            // Accélération proportionnelle à la distance, limitée à maxScrollSpeed
+            const accelerationFactor = Math.min(distanceBeyondThreshold / accelerationZone, 1);
+            speed += (maxScrollSpeed - baseScrollSpeed) * accelerationFactor;
+        }
+        
+        // Appliquer le scroll
+        container.scrollTop += speed * scrollDirection;
+        
+        // Feedback visuel
+        container.classList.add(scrollDirection === -1 ? 'scrolling-up' : 'scrolling-down');
+        
+        // Planifier le prochain frame de scroll pour fluidité
+        requestAnimationFrame(() => {
+            // On rappelle la fonction avec le même event pour continuer le scroll
+            // On vérifie d'abord si le drag est toujours en cours
+            if (document.querySelector('.dragging')) {
+                autoScrollDuringDrag(container, event);
+            }
+        });
+    }
+    
+    // Optimisation des performances
+    container.style.willChange = 'scroll-position';
+}
+
+function addSourateToPlaylist(sourateIndex) {
+    if (!draftPlaylist.includes(sourateIndex)) {
+        draftPlaylist.push(sourateIndex);
+        updatePlaylistUI();
+    }
+}
+
+function addSurahRangeToPlaylist() {
+    const startIndex = parseInt(document.getElementById('start-surah').value);
+    const endIndex = parseInt(document.getElementById('end-surah').value);
+    
+    // Ajouter à draftPlaylist au lieu de currentPlaylist
+    const step = startIndex <= endIndex ? 1 : -1;
+    
+    for (let i = startIndex; i !== endIndex + step; i += step) {
+        if (!draftPlaylist.includes(i)) {
+            draftPlaylist.push(i);
+        }
+    }
+    
+    updatePlaylistUI();
+}
+
+function saveCurrentPlaylist() {
+    if (draftPlaylist.length === 0) {  // Utiliser draftPlaylist au lieu de currentPlaylist
+        showPlaylistError("La playlist est vide !");
+        return;
+    }
+    
+    let playlistName = document.getElementById('playlist-name').value.trim();
+    if (!playlistName) {
+        playlistName = `SansNom_${Date.now().toString().slice(-4)}`;
+    }
+    
+    const savedPlaylists = JSON.parse(getCookie('savedPlaylists') || {});
+    savedPlaylists[playlistName] = [...draftPlaylist];  // Sauvegarder la copie de draft
+    setCookie('savedPlaylists', JSON.stringify(savedPlaylists));
+    
+    // Feedback visuel
+    const saveBtn = document.getElementById('save-playlist');
+    saveBtn.innerHTML = '✓';
+    setTimeout(() => saveBtn.innerHTML = '💾', 1000);
+    
+    loadSavedPlaylists();
+}
+
+function loadSavedPlaylists() {
+    const savedPlaylistsList = document.getElementById('saved-playlists-list');
+    if (!savedPlaylistsList) return;
+    
+    savedPlaylistsList.innerHTML = '';
+    
+    const savedPlaylists = getCookie('savedPlaylists');
+    if (!savedPlaylists) {
+        savedPlaylistsList.innerHTML = '<p>Aucune playlist sauvegardée</p>';
+        return;
+    }
+    
+    const playlists = JSON.parse(savedPlaylists);
+    
+    Object.entries(playlists).forEach(([name, playlist]) => {
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.margin = '5px 0';
+        item.style.padding = '5px';
+        item.style.backgroundColor = '#333';
+        item.style.borderRadius = '5px';
+        
+        item.innerHTML = `
+            <span>${name}</span>
+            <div>
+                <span class="load-playlist" data-name="${name}" style="cursor:pointer;color:#55ff55;margin-right:10px;">[charger]</span>
+                <span class="delete-playlist" data-name="${name}" style="cursor:pointer;color:#ff5555;">[suppr]</span>
+            </div>
+        `;
+        
+        savedPlaylistsList.appendChild(item);
+    });
+    
+    document.querySelectorAll('.load-playlist').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const name = e.target.getAttribute('data-name');
+            loadPlaylist(name);
+        });
+    });
+    
+    document.querySelectorAll('.delete-playlist').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const name = e.target.getAttribute('data-name');
+            deletePlaylist(name);
+        });
+    });
+}
+
+function loadPlaylist(name) {
+    const savedPlaylists = getCookie('savedPlaylists');
+    if (!savedPlaylists) return;
+    
+    const playlists = JSON.parse(savedPlaylists);
+    if (playlists[name]) {
+        currentPlaylist = playlists[name];
+        updatePlaylistUI();
+
+        // Revenir à l'onglet "Créer une playlist"
+        const tabCreate = document.getElementById('tab-create-playlist');
+        const tabMy = document.getElementById('tab-my-playlists');
+        const currentPlaylistDiv = document.getElementById('current-playlist');
+        const savedPlaylistsDiv = document.getElementById('saved-playlists');
+        if (tabCreate && tabMy && currentPlaylistDiv && savedPlaylistsDiv) {
+            tabCreate.classList.add('active');
+            tabMy.classList.remove('active');
+            currentPlaylistDiv.style.display = '';
+            savedPlaylistsDiv.style.display = 'none';
+        }
+    }
+}
+
+function deletePlaylist(name) {
+    const savedPlaylists = getCookie('savedPlaylists');
+    if (!savedPlaylists) return;
+    
+    const playlists = JSON.parse(savedPlaylists);
+    delete playlists[name];
+    
+    setCookie('savedPlaylists', JSON.stringify(playlists));
+    loadSavedPlaylists();
+}
+
+function clearCurrentPlaylist() {
+    currentPlaylist = [];
+    updatePlaylistUI();
+}
+
+async function playCurrentPlaylist() {
+    // Déterminer quelle playlist utiliser
+    const activeTab = document.querySelector('.playlist-tab.active').id;
+    
+    // Si on est dans l'onglet "Créer", utiliser draftPlaylist
+    if (activeTab === 'tab-create-playlist') {
+        if (draftPlaylist.length === 0) {
+            showPlaylistError("La playlist est vide !");
+            return;
+        }
+        currentPlaylist = [...draftPlaylist]; // Copie la draft
+    } 
+    // Sinon utiliser currentPlaylist (pour l'onglet "En cours")
+    else if (currentPlaylist.length === 0) {
+        showPlaylistError("Aucune sourate dans la playlist en cours");
+        return;
+    }
+
+    // Fermer l'interface playlist
+    isInitialLoad = false;
+    enableControls();
+    togglePlaylistMode();
+    updateCurrentPlayingUI();
+    
+    // Réinitialiser l'index
+    currentPlaylistIndex = 0;
+    
+    // Arrêter toute lecture en cours
+    if (currentAudio) {
+        currentAudio.pause();
+        clearInterval(updateInterval);
+        clearInterval(currentHighlightInterval);
+    }
+    
+    if (playlistAudio) {
+        playlistAudio.pause();
+    }
+    
+    // Créer un nouvel objet Audio pour la playlist
+    playlistAudio = new Audio();
+    playlistAudio.volume = currentVolume;
+    playlistAudio.loop = isLoopEnabled;
+    
+    isPlaying = true;
+    ['play-pause', 'play-pause-mobile'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '[stop]';
+    });
+    
+    playNextInPlaylist();
+}
+
+// Fonction helper pour les messages d'erreur
+function showPlaylistError(message) {
+    let errorMsg = document.getElementById('playlist-empty-msg');
+    if (errorMsg) errorMsg.remove();
+    
+    errorMsg = document.createElement('div');
+    errorMsg.id = 'playlist-empty-msg';
+    errorMsg.textContent = message;
+    errorMsg.style.cssText = `
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: #ff2222;
+        opacity: 1;
+        transition: opacity 0.2s ease-in-out;
+        position: absolute;
+        width: calc(100% - 40px);
+        bottom: 60px;
+        left: 20px;
+    `;
+    
+    const playBtn = document.getElementById('play-playlist');
+    if (playBtn?.parentNode) {
+        playBtn.parentNode.insertBefore(errorMsg, playBtn);
+    }
+    
+    // Animation clignotante
+    let flashCount = 0;
+    const flashInterval = setInterval(() => {
+        errorMsg.style.opacity = errorMsg.style.opacity === '1' ? '0.3' : '1';
+        if (++flashCount >= 6) {
+            clearInterval(flashInterval);
+            setTimeout(() => errorMsg.remove(), 200);
+        }
+    }, 200);
+}
+
+async function playNextInPlaylist() {
+    if (currentPlaylistIndex >= currentPlaylist.length) {
+        // Fin de la playlist
+        isPlaying = false;
+        ['play-pause', 'play-pause-mobile'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '[play]';
+        });
+        clearInterval(updateInterval);
+        return;
+    }
+    
+    const sourateIndex = currentPlaylist[currentPlaylistIndex];
+    const sourate = sourates[sourateIndex];
+    currentSourateIndex = sourateIndex;
+    
+    // Mettre à jour l'interface
+    ['play-pause', 'play-pause-mobile'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '[stop]';
+    });
+    updateSourateName(sourate);
+    updateNavigationButtons();
+
+    // Ajout : mise à jour de la playlist en cours si l'onglet est affiché
+    const currentPlayingDiv = document.getElementById('current-playing-playlist');
+    if (currentPlayingDiv && currentPlayingDiv.style.display !== 'none') {
+        updateCurrentPlayingUI();
+    }
+    
+    // Charger les données du sheikh
+    const isMobile = window.matchMedia('(max-width: 600px)').matches;
+    const sheikh = isMobile ? 
+        sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : 
+        sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
+    
+    try {
+        const sheikhData = await loadSheikhData(sheikh);
+        if (sheikhData && sheikhData[sourate.number]) {
+            const surahData = sheikhData[sourate.number];
+            const audioUrl = surahData["audio_files"][0]["audio_url"];
+
+            // Initialiser les timings des versets
+            currentVerseTimings = surahData["audio_files"][0]["verse_timings"] || [];
+
+            document.querySelectorAll('.details')[0].textContent = formatDuration(surahData["audio_files"][0]["duration"]);
+            document.querySelectorAll('.details')[1].textContent = formatSize(surahData["audio_files"][0]["file_size"]);
+            document.querySelector('.source').onclick = () => window.open(audioUrl);
+
+            // Configurer l'audio
+            playlistAudio.src = audioUrl;
+            playlistAudio.loop = isLoopEnabled; 
+            playlistAudio.currentTime = 0;
+            
+            // Démarrer la lecture
+            await playlistAudio.play();
+            startHighlightInterval();
+            
+            // Mettre à jour le temps
+            updateInterval = setInterval(updateCurrentTime, 1000);
+            
+            // Gestionnaire de fin de lecture
+            playlistAudio.onended = () => {
+                clearInterval(updateInterval);
+                stopHighlightInterval();
+                currentPlaylistIndex++;
+                playNextInPlaylist();
+            };
+            
+            // Charger le texte de la sourate si l'interface est ouverte
+            if (document.querySelector('.sourate-container').style.opacity === '1') {
+                loadSurahText(sourateIndex);
+            }
+        }
+    } catch (error) {
+        console.error('Erreur de lecture:', error);
+        currentPlaylistIndex++;
+        playNextInPlaylist();
+    }
+}
+
+function clearCurrentPlaylist() {
+    // Efface uniquement la playlist en cours de création
+    draftPlaylist = [];
+    updatePlaylistUI();
+}
