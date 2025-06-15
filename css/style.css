@@ -383,7 +383,7 @@ body {
 .circular-btn {
   position: fixed;
   bottom: 20px;
-  right: 20px;
+  right: 100px;
   width: 60px;
   height: 60px;
   border-radius: 50%;
@@ -1311,6 +1311,10 @@ body::-webkit-scrollbar,
   flex-direction: column;
   max-height: 700px;
   overflow-y: auto;
+}
+
+.circular-btn {
+  right: 20px;
 }
 
 @media (max-width: 1024px) and (min-width: 768px) {

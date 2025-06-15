@@ -25,6 +25,11 @@ let currentPlaylistIndex = 0;
 let draftPlaylist = [];   // Playlist en cours de création/modification
 let playlistAudio = null;
 
+// Variables globales pour les métadonnées
+let currentSurahName = '';
+let currentSheikhName = '';
+let currentSheikh = null;
+
 // === Tutoriel interactif avec effet "spotlight" ===
 let tutorialStep = 0;
 let tutorialOverlay = null;
@@ -1199,12 +1204,35 @@ function returnToCarousel() {
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
 
-    const sheikhcurrent = sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent);
+    // Récupération sécurisée du nom du sheikh
+    const sheikhNameElement = document.querySelector('.sheikh-name-mobile');
+    if (!sheikhNameElement) {
+        console.error("Élément .sheikh-name-mobile non trouvé");
+        return;
+    }
+
+    const sheikhName = sheikhNameElement.textContent;
+    const sheikhcurrent = sheikhs.find(s => s.name === sheikhName);
+    
+    if (!sheikhcurrent) {
+        console.error("Sheikh non trouvé :", sheikhName);
+        return;
+    }
 
     // 1. Préparer les éléments
     const activeSlide = document.querySelector('[data-active]');
-    const sheikhImg = activeSlide?.querySelector('img');
+    if (!activeSlide) {
+        console.error("Slide active non trouvée");
+        return;
+    }
+
+    const sheikhImg = activeSlide.querySelector('img');
     const overlayImg = document.querySelector('.sheikh-photo-mobile');
+    
+    if (!sheikhImg || !overlayImg) {
+        console.error("Éléments d'image non trouvés");
+        return;
+    }
 
     // 2. Cloner l'image de l'overlay
     const imgRect = overlayImg.getBoundingClientRect();
@@ -1228,7 +1256,6 @@ function returnToCarousel() {
     document.body.appendChild(imgClone);
 
     // 3. Masquer l'écran principal pendant l'animation
-    // Attendre que le clone soit créé avant de masquer l'écran principal
     setTimeout(() => {
         const mainScreenPhone = document.getElementById('main-screen-phone');
         if (mainScreenPhone) {
@@ -1236,21 +1263,23 @@ function returnToCarousel() {
             mainScreenPhone.style.pointerEvents = 'none';
             mainScreenPhone.style.display = 'none';
         }
-    }, 200); // petit délai pour garantir que le clone est dans le DOM
+    }, 200);
 
-    // 4. Déclencher la transition de l'image vers sa position cible (slide)
+    // 4. Déclencher la transition de l'image vers sa position cible
     requestAnimationFrame(() => {
         imgClone.style.top = targetRect.top + 'px';
         imgClone.style.left = targetRect.left + 'px';
         imgClone.style.width = targetRect.width + 'px';
         imgClone.style.height = targetRect.height + 'px';
-        imgClone.style.borderRadius = '16px'; // pour ressembler à la slide si elle est carrée
+        imgClone.style.borderRadius = '16px';
     });
+
     // 5. Après l'animation (0.8s), afficher le carousel + nettoyage
     setTimeout(() => {
         // Réactiver l'écran d'accueil
         const welcomeMessage = document.querySelector('.welcome-message');
         const welcomeScreen = document.querySelector('.welcome-screen');
+        
         if (welcomeMessage) {
             welcomeMessage.classList.remove('fade-out');
             welcomeMessage.style.display = 'inline';
@@ -1261,6 +1290,7 @@ function returnToCarousel() {
                 welcomeMessage.style.opacity = '1';
             }, 10);
         }
+        
         if (welcomeScreen) {
             welcomeScreen.classList.remove('fade-in');
             welcomeScreen.style.display = 'block';
@@ -1268,7 +1298,7 @@ function returnToCarousel() {
             welcomeScreen.style.opacity = '0';
             welcomeScreen.style.pointerEvents = 'auto';
             setTimeout(() => {
-            welcomeScreen.style.opacity = '1';
+                welcomeScreen.style.opacity = '1';
             }, 100);
         }
 
@@ -1293,26 +1323,29 @@ function returnToCarousel() {
         const currentIndex = slides.findIndex(slide =>
             slide.querySelector('.sheikh__name')?.textContent === sheikhcurrent.name
         );
-        const offset = currentIndex - middleIndex;
-        if (offset > 0) {
-            for (let i = 0; i < offset; i++) {
-                const $first = document.querySelectorAll(".carousel__item")[0];
-                carouselList.append($first);
-            }
-        } else if (offset < 0) {
-            for (let i = 0; i < Math.abs(offset); i++) {
-                const $slides = document.querySelectorAll(".carousel__item");
-                const $last = $slides[$slides.length - 1];
-                carouselList.prepend($last);
+        
+        if (currentIndex >= 0) {
+            const offset = currentIndex - middleIndex;
+            if (offset > 0) {
+                for (let i = 0; i < offset; i++) {
+                    const $first = document.querySelectorAll(".carousel__item")[0];
+                    carouselList.append($first);
+                }
+            } else if (offset < 0) {
+                for (let i = 0; i < Math.abs(offset); i++) {
+                    const $slides = document.querySelectorAll(".carousel__item");
+                    const $last = $slides[$slides.length - 1];
+                    carouselList.prepend($last);
+                }
             }
         }
 
         // Nettoyage du clone
         setTimeout(() => {
             imgClone.remove();
-        }, 100); // petit délai pour éviter un flash si la transition n'est pas terminée
- 
-        // Redémarrer l’auto-slide
+        }, 100);
+
+        // Redémarrer l'auto-slide
         if (auto) clearInterval(auto);
         auto = setInterval(() => {
             const $slides = document.querySelectorAll(".carousel__item");
@@ -1320,7 +1353,7 @@ function returnToCarousel() {
             document.querySelector(".carousel__list").append($first);
             activateSlide(document.querySelectorAll(".carousel__item")[middleIndex]);
         }, 5000);
-    }, 750); // délai = durée transition + 50ms
+    }, 750);
 }
 
 function createOverlayMobile(data) {
@@ -1734,7 +1767,6 @@ function highlightCurrentVerse() {
 
 // Appeler cette fonction régulièrement pendant la lecture
 function startHighlightInterval() {
-    console.log("Démarrage de l'intervalle de surlignage");
     clearInterval(currentHighlightInterval); // Nettoyer l'intervalle précédent
     currentHighlightInterval = setInterval(highlightCurrentVerse, 100); // Vérifier toutes les 100ms
 }
@@ -2200,6 +2232,7 @@ window.initializeSheikh = function (index) {
     });
 
     const sheikh = sortedSheikhs[index];
+    currentSheikh = sheikh;
     displaySheikhStats(sheikh);
 
     const welcomeMessage = document.querySelector('.welcome-message');
@@ -2341,11 +2374,13 @@ window.initializeSheikh = function (index) {
                 if (sheikhstats) applyTextReveal(sheikhstats, 600, 300);
 
             }
-            const playlistBtn = document.getElementById('playlist');
-            playlistBtn.style.display = 'flex';
-            playlistBtn.style.opacity = '1';
-            playlistBtn.style.right = '100px';
-            playlistBtn.addEventListener('click', togglePlaylistMode);
+            if (!window.matchMedia('(max-width: 600px)').matches) {
+                const playlistBtn = document.getElementById('playlist');
+                playlistBtn.style.display = 'flex';
+                playlistBtn.style.opacity = '1';
+                playlistBtn.style.right = '20px';
+                playlistBtn.addEventListener('click', togglePlaylistMode);
+            }
 
         }, 800);
 
@@ -2816,6 +2851,7 @@ function updateSheikhHighlights() {
     // 1. Mettre à jour le menu
     document.querySelectorAll('.menu-item').forEach(item => {
         const sheikhName = item.textContent;
+        currentSheikh = sheikhs.find(s => s.name === sheikhName);
         item.classList.toggle('highlight', favList.includes(sheikhName));
     });
 
@@ -3676,6 +3712,12 @@ async function playNextInPlaylist() {
         sheikhs.find(s => s.name === document.querySelector('.sheikh-name-mobile').textContent) : 
         sheikhs.find(s => s.name === document.querySelector('.sheikh-name').textContent);
     
+    currentSurahName = `${sourate.number}. ${sourate.name} (${sourate.arabicname})`;
+    currentSheikhName = currentSheikh.name;
+    
+    setupMediaSession();
+    updatePlayPauseUI(true);
+    
     try {
         const sheikhData = await loadSheikhData(sheikh);
         if (sheikhData && sheikhData[sourate.number]) {
@@ -3725,4 +3767,95 @@ function clearCurrentPlaylist() {
     // Efface uniquement la playlist en cours de création
     draftPlaylist = [];
     updatePlaylistUI();
+}
+
+function updatePlayPauseUI(isPlaying) {
+    // Mise à jour des boutons desktop et mobile
+    ['play-pause', 'play-pause-mobile'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = isPlaying ? '[stop]' : '[play]';
+            el.classList.toggle('playing', isPlaying);
+            el.classList.toggle('paused', !isPlaying);
+        }
+    });
+}
+
+// Écouteurs pour la synchronisation
+playlistAudio.addEventListener('play', () => {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+    }
+    updatePlayPauseUI(true);
+});
+
+playlistAudio.addEventListener('pause', () => {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+    }
+    updatePlayPauseUI(false);
+});
+
+playlistAudio.addEventListener('ended', () => {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'none';
+    }
+});
+
+// Gestion du retour à l'application
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        updatePlayPauseUI(!playlistAudio.paused);
+    }
+});
+
+function setupMediaSession() {
+    if ('mediaSession' in navigator) {
+        // 1. Mise à jour des métadonnées avec plus de détails
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: currentSurahName,
+            artist: currentSheikhName,
+            album: 'Coran Recitation',
+            artwork: [
+                { src: currentSheikh.photo, sizes: '96x96', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '128x128', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '192x192', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '256x256', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '384x384', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '512x512', type: 'image/png' }
+            ]
+        });
+
+        // 2. Configuration des actions (inchangé)
+        navigator.mediaSession.setActionHandler('play', () => {
+            playlistAudio.play();
+            updatePlayPauseUI(true);
+        });
+
+        navigator.mediaSession.setActionHandler('pause', () => {
+            playlistAudio.pause();
+            updatePlayPauseUI(false);
+        });
+
+        navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+            const skipTime = details.seekOffset || 30;
+            playlistAudio.currentTime = Math.max(0, playlistAudio.currentTime - skipTime);
+            updateCurrentTime();
+        });
+
+        navigator.mediaSession.setActionHandler('seekforward', (details) => {
+            const skipTime = details.seekOffset || 30;
+            playlistAudio.currentTime = Math.min(playlistAudio.duration, playlistAudio.currentTime + skipTime);
+            updateCurrentTime();
+        });
+
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+            playPrevSourate();
+        });
+        
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+            playNextSourate();
+        });
+
+    }
 }
