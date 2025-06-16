@@ -3831,8 +3831,6 @@ async function playNextInPlaylist() {
         }
     } catch (error) {
         console.error('Erreur de lecture:', error);
-        currentPlaylistIndex++;
-        playNextInPlaylist();
     }
 }
 
