@@ -61,14 +61,24 @@ const tutorialConfig = [
         placement: "bottom"
     },
     {
-        target: ".circular-btn",
+        target: "#quran-button",
         message: "Cliquez ici pour afficher ou masquer le texte de la sourate.",
+        placement: "top"
+    },
+    {
+        target: "#playlist",
+        message: "Créer vos playlists personnalisées et lancez les sourates dans l'ordre que vous voulez",
         placement: "top"
     },
     {
         target: ".media-info",
         message: 'Ici, vous pouvez :<ul><li>Activer le mode "All" pour écouter toutes les sourates à la suite</li><li>Activer "Learning Path" pour réviser dans l\'ordre inverse</li></ul>Ajouter un réciteur à vos favoris ! ⭐',
         placement: "right"
+    },
+    {
+        target: "#help-tutorial-btn",
+        message: "Besoin d’aide ou envie de revoir le tutoriel ? Cliquez ici pour relancer la visite interactive à tout moment.",
+        placement: "bottom"
     },
     {
         target: null,
@@ -79,11 +89,9 @@ const tutorialConfig = [
 
 function startTutorial() {
     tutorialStep = 0;
-
-    // Sauvegarder et modifier l'affichage du bouton
-    const circularBtn = document.querySelector('.circular-btn');
+    const circularBtn = document.getElementById('quran-button');
     if (circularBtn) {
-        originalCircularBtnDisplay = circularBtn.style.display; // Sauvegarder l'état original
+        originalCircularBtnDisplay = circularBtn.style.display;
         circularBtn.style.display = 'flex';
     }
 
@@ -113,12 +121,11 @@ function showTutorialStep() {
     }
 
     if (tutorialStep >= tutorialConfig.length) {
-        // Restaurer l'affichage original du bouton
-        const circularBtn = document.querySelector('.circular-btn');
+        const circularBtn = document.getElementById('quran-button');
         if (circularBtn && originalCircularBtnDisplay !== null) {
             circularBtn.style.display = originalCircularBtnDisplay;
         } else if (circularBtn) {
-            circularBtn.style.display = 'none'; // Fallback si l'état original n'est pas disponible
+            circularBtn.style.display = 'none';
         }
 
         removeTutorialOverlay();
@@ -138,7 +145,7 @@ function showTutorialStep() {
 }
 
 function createTutorialOverlay(step, targetEl) {
-    // Créer l'overlay
+
     tutorialOverlay = document.createElement('div');
     tutorialOverlay.className = 'tutorial-overlay';
     Object.assign(tutorialOverlay.style, {
@@ -151,17 +158,13 @@ function createTutorialOverlay(step, targetEl) {
         pointerEvents: 'auto'
     });
 
-    // Calculer la position du trou avec une valeur par défaut pour rx
     const hole = calculateHolePosition(targetEl);
     
-    // Ajouter le masque SVG
     tutorialOverlay.innerHTML = createSvgMask(hole);
     
-    // Créer et positionner le message
     const msgBox = createMessageBox(step, hole);
     tutorialOverlay.appendChild(msgBox);
 
-    // Gestion des événements
     setupEventListeners();
 
     document.body.appendChild(tutorialOverlay);
@@ -169,7 +172,7 @@ function createTutorialOverlay(step, targetEl) {
 
 function calculateHolePosition(targetEl) {
     const padding = 12;
-    const borderRadius = 12; // Valeur fixe pour rx
+    const borderRadius = 12;
     
     if (!targetEl) {
         return { 
@@ -265,12 +268,10 @@ function calculateMessagePosition(placement, hole, msgBox) {
 }
 
 function setupEventListeners() {
-    // Empêcher les clics sur l'overlay de se propager
     tutorialOverlay.addEventListener('click', (e) => {
         e.stopPropagation();
     });
 
-    // Gestion du bouton Suivant
     const nextBtn = tutorialOverlay.querySelector('#tutorial-next-btn');
     if (nextBtn) {
         nextBtn.addEventListener('click', (e) => {
@@ -397,7 +398,6 @@ function showMobileTutorialStep() {
 
 function scrollToElement(element) {
     return new Promise((resolve) => {
-        // Vérifier si l'élément est déjà visible
         const rect = element.getBoundingClientRect();
         const isVisible = (
             rect.top >= 0 &&
@@ -411,18 +411,15 @@ function scrollToElement(element) {
             return;
         }
 
-        // Ajouter un léger décalage pour la position (60px pour laisser de la marge)
         const offset = 60;
         const elementPosition = element.getBoundingClientRect().top;
         const offsetPosition = elementPosition + window.pageYOffset - offset;
 
-        // Faire le scroll en douceur
         window.scrollTo({
             top: offsetPosition,
             behavior: 'smooth'
         });
 
-        // Attendre que le scroll soit terminé
         setTimeout(resolve, 400);
     });
 }
@@ -517,7 +514,6 @@ function calculateMobileMessagePosition(placement, hole, msgBox) {
     const spacing = 20;
     const maxBoxWidth = 320;
 
-    // Prend la vraie hauteur de la boîte, ou une valeur de secours
     const msgBoxRect = msgBox.getBoundingClientRect();
     const msgBoxHeight = msgBoxRect.height || 110;
 
@@ -547,16 +543,12 @@ function calculateMobileMessagePosition(placement, hole, msgBox) {
         left = hole.x + hole.width / 2 - maxBoxWidth / 2;
     }
 
-    // Empêche le débordement horizontal
     left = Math.max(minMargin, Math.min(left || 0, window.innerWidth - maxBoxWidth - minMargin));
     right = Math.max(minMargin, window.innerWidth - (left + maxBoxWidth));
-
-    // Empêche le débordement haut
     if (placement === 'top') {
         top = Math.min(top, hole.y - msgBoxHeight - spacing);
     }
 
-    // Clamp final du top
     top = Math.max(minMargin, Math.min(top, window.innerHeight - msgBoxHeight - minMargin));
 
     return { top, left, right };
@@ -608,12 +600,12 @@ if (document.body) {
 window.startMobileTutorial = startMobileTutorial;
 
 function textRevealAnimation(element, { duration = 1000, delay = 0, reverse = false, absolute = false, pointerEvents = false }) {
-    const textNodes = getTextNodes(element); // Récupère tous les nœuds texte dans l'élément
+    const textNodes = getTextNodes(element); 
     const lengths = textNodes.map(node => node.nodeValue.length);
     const originalText = textNodes.map(node => node.nodeValue).join("");
     const placeholder = originalText.split(" ").map(word => {
         let placeholder = "";
-        for (let i = 0; i < word.length; i++) placeholder += " "; // Espaces insécables
+        for (let i = 0; i < word.length; i++) placeholder += " ";
         return placeholder;
     }).join(" ");
 
@@ -634,8 +626,8 @@ function textRevealAnimation(element, { duration = 1000, delay = 0, reverse = fa
         duration,
         delay,
         tick: (progress) => {
-        progress = -(Math.cos(Math.PI * progress) - 1) / 2; // Courbe de progression
-        progress = Math.pow(progress, 2); // Accélération
+        progress = -(Math.cos(Math.PI * progress) - 1) / 2;
+        progress = Math.pow(progress, 2);
         if (reverse) progress = 1 - progress;
 
         let revealedLength = Math.floor(originalText.length * Math.abs(progress * direction));
@@ -793,7 +785,6 @@ function updateNavigationButtons() {
     });
 }
 
-// Fonction pour mettre à jour le nom de la sourate
 function updateSourateName(sourate) {
     ['current-sourate', 'current-sourate-mobile'].forEach(id => {
         const marquee = document.getElementById(id);
@@ -814,7 +805,6 @@ function updateSourateName(sourate) {
     });
 }
 
-// Fonction pour mettre à jour le temps
 function updateCurrentTime() {
     const audio = playlistAudio;
     if (audio) {
@@ -835,7 +825,6 @@ function updateCurrentTime() {
     }
 }
 
-// Fonctions pour jouer suivant/précédent (version optimisée)
 function playNextSourate() {
     // Cas 1: Si on est à la fin d'une playlist unitaire terminée
     if (currentPlaylist.length === 1 && !isPlaying) {
@@ -945,13 +934,12 @@ function loadSurahText(index) {
     return new Promise((resolve, reject) => {
         const surahNumber = String(index + 1);
 
-        // Détection automatique : moins de 768px = mobile
         const isMobile = window.matchMedia('(max-width: 600px)').matches;
         
         loadJSON(`./js/surah/${surahNumber}.json`)
             .then(data => {
                 currentSurahText = data;
-                displaySurahText(currentSurahText, isMobile); // passe l'info mobile
+                displaySurahText(currentSurahText, isMobile);
                 resolve();
             })
             .catch(error => {
@@ -966,7 +954,6 @@ function formatDuration(durationMs) {
     const minutes = Math.floor((durationMs / (1000 * 60)) % 60);
     const hours = Math.floor((durationMs / (1000 * 60 * 60)));
     
-    // Toujours afficher les heures, même si elles sont à 0
     return String(hours).padStart(2, '0') + ':' +
            String(minutes).padStart(2, '0') + ':' +
            String(seconds).padStart(2, '0');
@@ -1081,25 +1068,22 @@ function createOverlay(data) {
     }
 
     favoriteSpan.onclick = () => {
-        // Mettre à jour la liste des favoris lors du clic
         let favSheikhs = getCookie('favSheikhs');
         favSheikhs = favSheikhs ? JSON.parse(favSheikhs) : [];
         const sheikhName = data.name;
 
         if (favSheikhs.includes(sheikhName)) {
-            // Supprimer des favoris
             favSheikhs = favSheikhs.filter(s => s !== sheikhName);
             favoriteSpan.classList.remove('active');
             favoriteSpan.textContent = '[favorite]';
         } else {
-            // Ajouter aux favoris
             favSheikhs.push(sheikhName);
             favoriteSpan.classList.add('active');
             favoriteSpan.textContent = '[forget]';
         }
 
         setCookie('favSheikhs', JSON.stringify(favSheikhs));
-        updateSheikhHighlights(); // Cette ligne va maintenant aussi réorganiser le carrousel
+        updateSheikhHighlights();
     };
 
     mediaInfo.appendChild(favoriteSpan);
@@ -1112,35 +1096,27 @@ function createOverlay(data) {
         isInitialLoad = false;
 
         if (isLearning) {
-            // Mode Learning Path activé
             learning.classList.add('active');
             
-            // Créer la playlist inversée
             currentPlaylist = Array.from({ length: sourates.length }, (_, i) => sourates.length - 1 - i);
             currentPlaylistIndex = 0;
             
-            // Préparer l'interface
             document.querySelector('.circular-btn').style.display = 'flex';
             document.querySelector('.circular-btn').style.opacity = '1';
             
-            // Si déjà en lecture, on redémarre
             if (isPlaying && playlistAudio && !playlistAudio.paused) {
                 playlistAudio.pause();
                 clearInterval(updateInterval);
                 clearInterval(currentHighlightInterval);
             }
             
-            // Démarrer la lecture
             togglePlaylistMode();
             enableControls();
             await playCurrentPlaylist();
         } else {
-            // Mode Learning Path désactivé
             learning.classList.remove('active');
             
-            // Si en cours de lecture
             if (isPlaying && playlistAudio && !playlistAudio.paused) {
-                // Option 1: Continuer la lecture de la sourate actuelle puis s'arrêter
                 playlistAudio.onended = () => {
                     ['play-pause', 'play-pause-mobile'].forEach(id => {
                         const el = document.getElementById(id);
@@ -1148,17 +1124,14 @@ function createOverlay(data) {
                     });
                 };
                 
-                // On réduit la playlist à la sourate actuelle seulement
                 currentPlaylist = [currentSourateIndex];
                 currentPlaylistIndex = 0;
 
             } else {
-                // Si pas en lecture, juste réinitialiser
                 currentPlaylist = [currentSourateIndex];
                 isPlaying = false;
             }
             
-            // Mettre à jour l'interface
             updatePlaylistUI && updatePlaylistUI();
         }
     };
@@ -1204,7 +1177,6 @@ function returnToCarousel() {
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
 
-    // Récupération sécurisée du nom du sheikh
     const sheikhNameElement = document.querySelector('.sheikh-name-mobile');
     if (!sheikhNameElement) {
         console.error("Élément .sheikh-name-mobile non trouvé");
@@ -1219,7 +1191,6 @@ function returnToCarousel() {
         return;
     }
 
-    // 1. Préparer les éléments
     const activeSlide = document.querySelector('[data-active]');
     if (!activeSlide) {
         console.error("Slide active non trouvée");
@@ -1255,7 +1226,6 @@ function returnToCarousel() {
 
     document.body.appendChild(imgClone);
 
-    // 3. Masquer l'écran principal pendant l'animation
     setTimeout(() => {
         const mainScreenPhone = document.getElementById('main-screen-phone');
         if (mainScreenPhone) {
@@ -1274,9 +1244,7 @@ function returnToCarousel() {
         imgClone.style.borderRadius = '16px';
     });
 
-    // 5. Après l'animation (0.8s), afficher le carousel + nettoyage
     setTimeout(() => {
-        // Réactiver l'écran d'accueil
         const welcomeMessage = document.querySelector('.welcome-message');
         const welcomeScreen = document.querySelector('.welcome-screen');
         
@@ -1302,13 +1270,10 @@ function returnToCarousel() {
             }, 100);
         }
 
-        // Remove fade-in-up from carouselList
         const carouselList = document.getElementById('sheikh-carousel');
         if (carouselList) {
             carouselList.classList.remove('fade-in-up');
         }
-
-        // Mettre à jour les slides pour activer celui du sheikh
         const slides = [...document.querySelectorAll(".carousel__item")];
         slides.forEach((slide) => {
             slide.classList.remove("exit-left", "exit-right");
@@ -1340,12 +1305,10 @@ function returnToCarousel() {
             }
         }
 
-        // Nettoyage du clone
         setTimeout(() => {
             imgClone.remove();
         }, 100);
 
-        // Redémarrer l'auto-slide
         if (auto) clearInterval(auto);
         auto = setInterval(() => {
             const $slides = document.querySelectorAll(".carousel__item");
@@ -1358,17 +1321,13 @@ function returnToCarousel() {
 
 function createOverlayMobile(data) {
     const overlay = document.getElementById('main-screen-phone');
-    // Réactive le scroll
     document.documentElement.style.overflow = 'visible'; 
     document.body.style.overflow = 'visible';          
 
-
-    // Rendre visible l'overlay mobile
     overlay.style.display = 'block';
     overlay.style.opacity = '1';
     overlay.style.pointerEvents = 'auto';
 
-    // Ajouter la classe mobile-overlay racine
     overlay.classList.add('mobile-overlay');
 
     const nameElement = document.querySelector('.sheikh-name-mobile');
@@ -1402,11 +1361,8 @@ function createOverlayMobile(data) {
         showMobileCookieAlert(overlay);
     }
 
-    // Vérifie si media-info-mobile existe déjà
     if (overlay.querySelector('.media-info-mobile')) {
-        // Si déjà présent, ne rien faire
     } else {
-        // Media info
         const mediaInfo = document.createElement('div');
         mediaInfo.className = 'media-info-mobile';
 
@@ -1692,6 +1648,7 @@ async function toggleMainScreenPhone() {
 
 function highlightCurrentVerse() {
     // Vérifier si l'audio ou les timings sont disponibles ou si le conteneur n'existe pas
+    // Détecter si on est en mode mobile ou desktop
     const container = document.querySelector('.sourate-container');
     if (!container || container.style.display === 'none' || container.style.opacity === '0') {
         return; // Ne rien faire si le conteneur n'est pas visible
@@ -2380,6 +2337,18 @@ window.initializeSheikh = function (index) {
                 playlistBtn.style.opacity = '1';
                 playlistBtn.style.right = '20px';
                 playlistBtn.addEventListener('click', togglePlaylistMode);
+
+                const helpBtn = document.getElementById('help-tutorial-btn');
+                if (helpBtn) {
+                    helpBtn.style.display = 'flex';
+                    helpBtn.style.opacity = '1';
+                    helpBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // Supprime le cookie pour forcer le tutoriel
+                    setCookie('tuto', '', -1);
+                    startTutorial();
+                    });
+                }
             }
 
         }, 800);
@@ -2446,7 +2415,10 @@ window.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
-            const container = document.querySelector('.sourate-container');
+            // Gérer le container selon le mode (mobile ou desktop)
+            const container = window.innerWidth <= 768
+                ? document.getElementById('sourate-container-mobile')
+                : document.querySelector('.sourate-container');
             if (current.style.opacity === '0') {
                 current.style.display = 'block'; 
                 current.style.opacity = '1';
@@ -3752,7 +3724,10 @@ async function playNextInPlaylist() {
             };
             
             // Charger le texte de la sourate si l'interface est ouverte
-            if (document.querySelector('.sourate-container').style.opacity === '1') {
+            if (
+                (isMobile && document.getElementById('sourate-container-mobile')?.style.opacity === '1') ||
+                (!isMobile && document.querySelector('.sourate-container')?.style.opacity === '1')
+            ) {
                 loadSurahText(sourateIndex);
             }
         }

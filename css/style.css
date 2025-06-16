@@ -642,6 +642,7 @@ audio {
     justify-content: center; /* Centre les éléments */
     flex-wrap: nowrap;       /* Empêche le retour à la ligne */
     gap: 15px;              /* Espace entre les éléments */
+    margin-right: 60px;
   }
   
   .carousel__item {
@@ -921,15 +922,23 @@ body::-webkit-scrollbar,
     cursor: not-allowed;
 }
 
-.tutorial-overlay {
-    pointer-events: auto !important;
-}
 .tutorial-message {
     animation: fadeInUp 0.4s;
 }
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(30px);}
     to { opacity: 1; transform: translateY(0);}
+}
+
+#help-tutorial-btn {
+  position: fixed;
+  top: 22px;
+  right: 22px;
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
 }
 
 #playlist.active {
@@ -1296,6 +1305,10 @@ body::-webkit-scrollbar,
     }
   }
 
+  .circular-btn {
+    right: 20px;
+  }
+
 }
 
 .menuL.tablet-mode {
@@ -1311,10 +1324,6 @@ body::-webkit-scrollbar,
   flex-direction: column;
   max-height: 700px;
   overflow-y: auto;
-}
-
-.circular-btn {
-  right: 20px;
 }
 
 @media (max-width: 1024px) and (min-width: 768px) {
