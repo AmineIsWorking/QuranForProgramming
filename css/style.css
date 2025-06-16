@@ -922,6 +922,10 @@ body::-webkit-scrollbar,
     cursor: not-allowed;
 }
 
+.tutorial-overlay {
+    pointer-events: auto !important;
+}
+
 .tutorial-message {
     animation: fadeInUp 0.4s;
 }

@@ -106,30 +106,20 @@ function showTutorialStep() {
     if (tutorialStep < tutorialConfig.length) {
         const step = tutorialConfig[tutorialStep];
 
-        // Si le step est .menuR-container mais qu'il n'existe pas, passer au suivant (#menuR)
+        // Gestion des étapes conditionnelles (existant déjà)
         if (step.target === '.menuR-container' && !document.querySelector('.menuR-container')) {
             tutorialStep++;
-            showTutorialStep();
-            return;
+            return showTutorialStep();
         }
-        // Si le step est #menuR mais que .menuR-container existe déjà, sauter ce step
         if (step.target === '#menuR' && document.querySelector('.menuR-container')) {
             tutorialStep++;
-            showTutorialStep();
-            return;
+            return showTutorialStep();
         }
     }
 
     if (tutorialStep >= tutorialConfig.length) {
-        const circularBtn = document.getElementById('quran-button');
-        if (circularBtn && originalCircularBtnDisplay !== null) {
-            circularBtn.style.display = originalCircularBtnDisplay;
-        } else if (circularBtn) {
-            circularBtn.style.display = 'none';
-        }
-
-        removeTutorialOverlay();
-        return;
+        // Fin du tutoriel (existant déjà)
+        return finalizeTutorial();
     }
 
     const step = tutorialConfig[tutorialStep];
@@ -137,11 +127,41 @@ function showTutorialStep() {
 
     if (step.target && !targetEl) {
         tutorialStep++;
-        showTutorialStep();
-        return;
+        return showTutorialStep();
     }
 
+    // 1. Calcul du scroll nécessaire AVANT création du msgBox
+    if (targetEl && (step.target === '.media-info' || step.target === '.souratesContainer')) {
+        const sheikhInfo = document.querySelector('.sheikh-info');
+        if (sheikhInfo) {
+            const targetRect = targetEl.getBoundingClientRect();
+            const sheikhRect = sheikhInfo.getBoundingClientRect();
+            
+            // Calcul de la position relative dans le conteneur
+            const positionRelative = targetRect.top - sheikhRect.top + sheikhInfo.scrollTop;
+            const margeMsgBox = 250; // Estimation de la hauteur du msgBox + marge
+            
+            // Si l'élément cible est trop bas, scroll vers lui
+            if (positionRelative + margeMsgBox > sheikhInfo.clientHeight) {
+                sheikhInfo.scrollTo({
+                    top: positionRelative - (sheikhInfo.clientHeight / 3), // Scroll pour centrer approximativement
+                    behavior: 'instant' // Pas d'animation pour éviter le délai
+                });
+            }
+        }
+    }
+
+    // 2. Création du msgBox seulement APRÈS le scroll
     createTutorialOverlay(step, targetEl);
+}
+
+// Fonction extraite pour plus de clarté
+function finalizeTutorial() {
+    const circularBtn = document.getElementById('quran-button');
+    if (circularBtn) {
+        circularBtn.style.display = originalCircularBtnDisplay || 'none';
+    }
+    removeTutorialOverlay();
 }
 
 function createTutorialOverlay(step, targetEl) {
@@ -166,6 +186,84 @@ function createTutorialOverlay(step, targetEl) {
     tutorialOverlay.appendChild(msgBox);
 
     setupEventListeners();
+
+    // Gestion du défilement automatique pour media-info ET souratesContainer
+    if (step.target === '.media-info' || step.target === '.souratesContainer') {
+        let scrollCheckInterval;
+
+        const getTargetElements = () => {
+            const target = document.querySelector(step.target);
+            const container = document.querySelector('.sheikh-info');
+            return { target, container };
+        };
+
+        const checkScrollNeeded = () => {
+            const { target, container } = getTargetElements();
+            if (!target || !container) return false;
+
+            const targetRect = target.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+
+            if (step.target === '.media-info') {
+                const basTarget = targetRect.bottom - containerRect.top + container.scrollTop;
+                const basVisible = container.scrollTop + container.clientHeight;
+                return (basTarget - basVisible) > 0;
+            } else { // souratesContainer
+                const hautTarget = targetRect.top - containerRect.top + container.scrollTop;
+                return hautTarget < container.scrollTop;
+            }
+        };
+
+        const performScroll = () => {
+            const { target, container } = getTargetElements();
+            if (!target || !container) return;
+
+            const targetRect = target.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const msgBoxHeight = msgBox.offsetHeight;
+
+            let targetScroll;
+
+            if (step.target === '.media-info') {
+                const basTarget = targetRect.bottom - containerRect.top + container.scrollTop;
+                const basVisible = container.scrollTop + container.clientHeight;
+                const difference = basTarget - basVisible;
+                targetScroll = container.scrollTop + difference + msgBoxHeight + 20;
+            } else { // souratesContainer
+                const hautTarget = targetRect.top - containerRect.top + container.scrollTop;
+                targetScroll = hautTarget - msgBoxHeight - 40;
+            }
+
+            container.scrollTo({
+                top: targetScroll,
+                behavior: 'smooth'
+            });
+        };
+
+        const nextBtn = tutorialOverlay.querySelector('#tutorial-next-btn');
+        // Démarrer la vérification
+        if (checkScrollNeeded()) {
+            performScroll();
+            scrollCheckInterval = setInterval(() => {
+                if (!checkScrollNeeded()) {
+                    clearInterval(scrollCheckInterval);
+                } else {
+                    performScroll();
+                }
+            }, 300);
+        }
+
+        // Nettoyage quand on passe à l'étape suivante
+        if (nextBtn) {
+            const originalNextHandler = nextBtn.onclick;
+            nextBtn.onclick = (e) => {
+                clearInterval(scrollCheckInterval);
+                if (typeof originalNextHandler === 'function') {
+                    originalNextHandler(e);
+                }
+            };
+        }
+    }
 
     document.body.appendChild(tutorialOverlay);
 }
