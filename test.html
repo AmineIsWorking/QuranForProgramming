@@ -76,6 +76,41 @@
             }
         }
 
+        // Fonction pour configurer les handlers MediaSession
+        function setupMediaSessionHandlers() {
+            if ('mediaSession' in navigator) {
+                try {
+                    navigator.mediaSession.setActionHandler('play', () => {
+                        if (!isPlaying) {
+                            globalAudioPlayer.play()
+                                .then(() => {
+                                    isPlaying = true;
+                                    playPauseBtn.textContent = "Pause";
+                                    statusEl.textContent = "Lecture reprise";
+                                    updateInterval = setInterval(updateCurrentTime, 200);
+                                });
+                        }
+                    });
+                    
+                    navigator.mediaSession.setActionHandler('pause', () => {
+                        if (isPlaying) {
+                            globalAudioPlayer.pause();
+                            isPlaying = false;
+                            playPauseBtn.textContent = "Play";
+                            statusEl.textContent = "En pause";
+                            clearInterval(updateInterval);
+                        }
+                    });
+                    
+                    navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
+                    navigator.mediaSession.setActionHandler('nexttrack', playNext);
+                    
+                } catch (error) {
+                    console.log("Erreur configuration MediaSession:", error);
+                }
+            }
+        }
+
         // Fonction pour charger et jouer une sourate de la playlist
         async function playSourateFromPlaylist() {
             if (currentPlaylistIndex >= currentPlaylist.length) {
@@ -85,6 +120,7 @@
                 isPlayAll = false;
                 playPauseBtn.textContent = "Play";
                 clearInterval(updateInterval);
+                updateMediaSessionMetadata();
                 return;
             }
 
@@ -110,7 +146,10 @@
                 // Démarrer la mise à jour du temps
                 clearInterval(updateInterval);
                 updateInterval = setInterval(updateCurrentTime, 200);
-                
+
+                updateMediaSessionMetadata();
+                setupMediaSessionHandlers(); // Configurer les handlers après le play()
+
                 // Gestionnaire de fin de lecture
                 globalAudioPlayer.onended = () => {
                     currentPlaylistIndex++;
@@ -124,6 +163,61 @@
                 playPauseBtn.textContent = "Play";
             }
         }
+
+        // Fonctions pour Media Session API
+        function updateMediaSessionMetadata() {
+            if ('mediaSession' in navigator) {
+                const sourateIndex = currentPlaylist[currentPlaylistIndex] ?? 0;
+                const sourate = sourates[sourateIndex];
+                navigator.mediaSession.metadata = new window.MediaMetadata({
+                    title: sourate ? `Sourate ${sourate.number}: ${sourate.name}` : "Quran",
+                    artist: "Abdul Baset",
+                    album: "Quran",
+                    artwork: [
+                        { src: "https://upload.wikimedia.org/wikipedia/commons/6/6b/Quran_Kareem.png", sizes: "512x512", type: "image/png" }
+                    ]
+                });
+            }
+        }
+
+        function playNext() {
+            if (currentPlaylist.length === 0) {
+                statusEl.textContent = "Aucune playlist active";
+                return;
+            }
+            
+            if (currentPlaylistIndex < currentPlaylist.length - 1) {
+                currentPlaylistIndex++;
+                statusEl.textContent = "Passage à la sourate suivante...";
+                playSourateFromPlaylist();
+            } else {
+                statusEl.textContent = "Vous êtes déjà sur la dernière sourate";
+            }
+        }
+
+        function playPrevious() {
+            if (currentPlaylist.length === 0) {
+                statusEl.textContent = "Aucune playlist active";
+                return;
+            }
+            
+            if (currentPlaylistIndex > 0) {
+                currentPlaylistIndex--;
+                statusEl.textContent = "Retour à la sourate précédente...";
+                playSourateFromPlaylist();
+            } else {
+                // Si on est sur la première sourate, retour au début
+                globalAudioPlayer.currentTime = 0;
+                statusEl.textContent = "Retour au début de la sourate actuelle";
+                updateCurrentTime();
+            }
+        }
+
+        // Écouteur pour l'événement 'playing' - important pour iOS
+        globalAudioPlayer.addEventListener('playing', () => {
+            setupMediaSessionHandlers();
+            updateMediaSessionMetadata();
+        });
 
         // Écouteurs d'événements
         playAllBtn.addEventListener('click', () => {
@@ -177,6 +271,7 @@
             clearInterval(updateInterval);
             currentPlaylist = [];
             currentPlaylistIndex = 0;
+            updateMediaSessionMetadata();
         });
 
         // Initialisation

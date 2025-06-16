@@ -3812,18 +3812,6 @@ function setupMediaSession() {
             updatePlayPauseUI(false);
         });
 
-        navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-            const skipTime = details.seekOffset || 30;
-            playlistAudio.currentTime = Math.max(0, playlistAudio.currentTime - skipTime);
-            updateCurrentTime();
-        });
-
-        navigator.mediaSession.setActionHandler('seekforward', (details) => {
-            const skipTime = details.seekOffset || 30;
-            playlistAudio.currentTime = Math.min(playlistAudio.duration, playlistAudio.currentTime + skipTime);
-            updateCurrentTime();
-        });
-
         navigator.mediaSession.setActionHandler('previoustrack', () => {
             playPrevSourate();
         });
