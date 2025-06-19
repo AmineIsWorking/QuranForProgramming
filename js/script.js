@@ -3748,17 +3748,20 @@ function showPlaylistError(message) {
 
 async function playNextInPlaylist() {
     if (currentPlaylistIndex >= currentPlaylist.length) {
-        // Fin de la playlist
         isPlaying = false;
         ['play-pause', 'play-pause-mobile'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.textContent = '[play]';
         });
         clearInterval(updateInterval);
-        
+    
+        // Laisser la MediaSession active et garder les métadonnées
         if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'paused';
+            // Les handlers restent actifs, rien à changer ici
         }
+    
+        // Ne pas return ici ! On laisse la MediaSession disponible
         return;
     }
     
@@ -3902,8 +3905,14 @@ function setupMediaSession() {
 
         // 2. Configuration des actions (inchangé)
         navigator.mediaSession.setActionHandler('play', () => {
-            playlistAudio.play();
-            updatePlayPauseUI(true);
+            if (playlistAudio && playlistAudio.paused && currentPlaylistIndex < currentPlaylist.length) {
+                playlistAudio.play();
+                updatePlayPauseUI(true);
+            } else if (currentPlaylistIndex >= currentPlaylist.length) {
+                // Playlist terminée : recommencer depuis le début
+                currentPlaylistIndex = 0;
+                playNextInPlaylist();
+            }
         });
 
         navigator.mediaSession.setActionHandler('pause', () => {
