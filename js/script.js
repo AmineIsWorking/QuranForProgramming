@@ -3886,9 +3886,7 @@ function setupMediaSession() {
         navigator.mediaSession.metadata = new MediaMetadata({
             title: currentSurahName,
             artist: currentSheikhName,
-            album: 'Coran Recitation',
             artwork: [
-                { src: currentSheikh.photo, sizes: '96x96', type: 'image/png' },
                 { src: currentSheikh.photo, sizes: '128x128', type: 'image/png' },
                 { src: currentSheikh.photo, sizes: '192x192', type: 'image/png' },
                 { src: currentSheikh.photo, sizes: '256x256', type: 'image/png' },
