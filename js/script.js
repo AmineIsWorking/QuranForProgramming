@@ -3887,8 +3887,6 @@ function setupMediaSession() {
             title: currentSurahName,
             artist: currentSheikhName,
             artwork: [
-                { src: currentSheikh.photo, sizes: '128x128', type: 'image/png' },
-                { src: currentSheikh.photo, sizes: '192x192', type: 'image/png' },
                 { src: currentSheikh.photo, sizes: '256x256', type: 'image/png' },
                 { src: currentSheikh.photo, sizes: '384x384', type: 'image/png' },
                 { src: currentSheikh.photo, sizes: '512x512', type: 'image/png' }
