@@ -3755,6 +3755,10 @@ async function playNextInPlaylist() {
             if (el) el.textContent = '[play]';
         });
         clearInterval(updateInterval);
+        
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'paused';
+        }
         return;
     }
     
@@ -3869,7 +3873,7 @@ playlistAudio.addEventListener('pause', () => {
 
 playlistAudio.addEventListener('ended', () => {
     if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'none';
+        navigator.mediaSession.playbackState = 'paused';
     }
 });
 
@@ -3887,6 +3891,9 @@ function setupMediaSession() {
             title: currentSurahName,
             artist: currentSheikhName,
             artwork: [
+                { src: currentSheikh.photo, sizes: '96x96', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '128x128', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '192x192', type: 'image/png' },
                 { src: currentSheikh.photo, sizes: '256x256', type: 'image/png' },
                 { src: currentSheikh.photo, sizes: '384x384', type: 'image/png' },
                 { src: currentSheikh.photo, sizes: '512x512', type: 'image/png' }
