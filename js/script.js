@@ -3748,20 +3748,13 @@ function showPlaylistError(message) {
 
 async function playNextInPlaylist() {
     if (currentPlaylistIndex >= currentPlaylist.length) {
+        // Fin de la playlist
         isPlaying = false;
         ['play-pause', 'play-pause-mobile'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.textContent = '[play]';
         });
         clearInterval(updateInterval);
-    
-        // Laisser la MediaSession active et garder les métadonnées
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'paused';
-            // Les handlers restent actifs, rien à changer ici
-        }
-    
-        // Ne pas return ici ! On laisse la MediaSession disponible
         return;
     }
     
@@ -3877,6 +3870,39 @@ playlistAudio.addEventListener('pause', () => {
 playlistAudio.addEventListener('ended', () => {
     if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'paused';
+
+        // Redéfinir les métadonnées pour maintenir la Media Session affichée
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: currentSurahName,
+            artist: currentSheikhName,
+            artwork: [
+                { src: currentSheikh.photo, sizes: '96x96', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '128x128', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '192x192', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '256x256', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '384x384', type: 'image/png' },
+                { src: currentSheikh.photo, sizes: '512x512', type: 'image/png' }
+            ]
+        });
+
+        // Réaffecter toutes les actions Media Session à chaque fin de lecture
+        navigator.mediaSession.setActionHandler('play', () => {
+            playlistAudio.play();
+            updatePlayPauseUI(true);
+        });
+
+        navigator.mediaSession.setActionHandler('pause', () => {
+            playlistAudio.pause();
+            updatePlayPauseUI(false);
+        });
+
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+            playPrevSourate();
+        });
+        
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+            playNextSourate();
+        });
     }
 });
 
@@ -3905,14 +3931,8 @@ function setupMediaSession() {
 
         // 2. Configuration des actions (inchangé)
         navigator.mediaSession.setActionHandler('play', () => {
-            if (playlistAudio && playlistAudio.paused && currentPlaylistIndex < currentPlaylist.length) {
-                playlistAudio.play();
-                updatePlayPauseUI(true);
-            } else if (currentPlaylistIndex >= currentPlaylist.length) {
-                // Playlist terminée : recommencer depuis le début
-                currentPlaylistIndex = 0;
-                playNextInPlaylist();
-            }
+            playlistAudio.play();
+            updatePlayPauseUI(true);
         });
 
         navigator.mediaSession.setActionHandler('pause', () => {
